@@ -1,4 +1,4 @@
-# Ignore Python virtual environments
+# Ignore virtual environments
 envs/
 venv/
 .fifa-env/
@@ -7,16 +7,16 @@ venv/
 __pycache__/
 *.py[cod]
 
-# Ignore Jupyter notebook checkpoints
+# Ignore notebook checkpoints
 .ipynb_checkpoints/
 
 # Ignore macOS system files
 .DS_Store
 
-# Ignore raw data (if needed)
+# Ignore raw data
 data/player_data/
 data/team_data/
 data/match_data.csv
 
-# Keep only cleaned data
+# Keep cleaned data
 !data/cleaned/
