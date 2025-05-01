@@ -2,7 +2,7 @@
 An interactive visualisation tool for analysing match-level performance and dynamics in the FIFA World Cup 2022, focusing on identifying patterns, upsets, and team behaviour across tournament stages.
 This repository contains a data visualization project for the FIFA World Cup 2022, based on cleaned player, team, and match datasets.
 
-## 📁 Project Structure
+## Project Structure
 
 - `data/cleaned/` – Cleaned CSV files used in the project
 - `scripts/clean_data.py` – Script used to clean raw datasets
@@ -10,7 +10,7 @@ This repository contains a data visualization project for the FIFA World Cup 202
 - `requirements.txt` – Python dependencies
 - `setup.sh` – Optional setup script to configure environment
 
-## ⚙️ Setup Instructions
+## Setup Instructions
 
 1. Clone the repository:
 ```bash
