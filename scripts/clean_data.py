@@ -43,10 +43,6 @@ player_df.dropna(axis=1, how='all', inplace=True)
 if 'age' in player_df.columns:
     player_df['age_years'] = player_df['age'].astype(str).str.split('-').str[0].astype(float)
 
-# Optional: Drop players with 0 playing time
-#if 'minutes_90s' in player_df.columns:
-#    player_df = player_df[player_df['minutes_90s'] > 0]
-
 # === Clean Team Data ===
 
 # Replace -1 with NaN (invalid data)
@@ -76,8 +72,10 @@ if 'score' in match_df.columns:
 # Drop columns with all missing values
 match_df.dropna(axis=1, how='all', inplace=True)
 
-# Standardize 'Iran' to match other datasets
-team_df['team'] = team_df['team'].replace({'Iran': 'IR Iran'})
+# Replace 'IR Iran' with 'Iran' across all datasets
+team_df['team'] = team_df['team'].replace({'IR Iran': 'Iran'})
+match_df.replace({'IR Iran': 'Iran'}, inplace=True)
+player_df['team'] = player_df['team'].replace({'IR Iran': 'Iran'})
 
 # === Save Cleaned Versions ===
 team_df.to_csv(CLEAN_DIR / "team_data_clean.csv", index=False)
