@@ -7,9 +7,147 @@ This module provides utility functions for loading and processing data.
 import pandas as pd
 import numpy as np
 import os
+import colorsys
 
 # Define the data path relative to the app root
 DATA_PATH = os.path.join('data', 'cleaned')  # Path to the cleaned data folder
+
+# Define a colorblind-friendly palette with reduced variety for better clarity
+# Using a smaller set of high-contrast, distinctive colors
+TEAM_COLORS = {
+    'Argentina': '#66c2a5',      # Teal
+    'Australia': '#fc8d62',      # Salmon
+    'Belgium': '#8da0cb',        # Blue-purple
+    'Brazil': '#e78ac3',         # Pink
+    'Cameroon': '#a6d854',       # Light green
+    'Canada': '#ffd92f',         # Yellow
+    'Costa Rica': '#e5c494',     # Tan
+    'Croatia': '#b3b3b3',        # Gray
+    'Denmark': '#4d4d4d',        # Dark gray
+    'Ecuador': '#80b1d3',        # Light blue
+    'England': '#bebada',        # Light purple
+    'France': '#fb8072',         # Light red/coral
+    'Germany': '#1f78b4',        # Dark blue
+    'Ghana': '#33a02c',          # Green
+    'Iran': '#ff7f00',           # Orange
+    'Japan': '#6a3d9a',          # Purple
+    'Korea Republic': '#b15928',  # Brown
+    'Mexico': '#ffff99',         # Light yellow
+    'Morocco': '#cab2d6',        # Light lavender
+    'Netherlands': '#fdbf6f',    # Light orange
+    'Poland': '#d9d9d9',         # Very light gray
+    'Portugal': '#e31a1c',       # Red
+    'Qatar': '#a6cee3',          # Very light blue
+    'Saudi Arabia': '#b2df8a',   # Light lime
+    'Senegal': '#1f78b4',        # Medium blue
+    'Serbia': '#fb9a99',         # Light pink
+    'Spain': '#e31a1c',          # Red
+    'Switzerland': '#fdbf6f',    # Light orange
+    'Tunisia': '#ff7f00',        # Orange
+    'United States': '#6a3d9a',  # Purple
+    'Uruguay': '#33a02c',        # Green
+    'Wales': '#cab2d6'           # Light lavender
+}
+
+# Pattern mapping for additional visual differentiation 
+# Each team gets a unique dash pattern to supplement color
+TEAM_PATTERNS = {
+    'Argentina': 'solid',
+    'Australia': 'dash',
+    'Belgium': 'dot',
+    'Brazil': 'dashdot',
+    'Cameroon': 'longdash',
+    'Canada': 'longdashdot',
+    'Costa Rica': 'solid',
+    'Croatia': 'dash',
+    'Denmark': 'dot',
+    'Ecuador': 'dashdot',
+    'England': 'longdash',
+    'France': 'longdashdot',
+    'Germany': 'solid',
+    'Ghana': 'dash',
+    'Iran': 'dot',
+    'Japan': 'dashdot',
+    'Korea Republic': 'longdash',
+    'Mexico': 'longdashdot',
+    'Morocco': 'solid',
+    'Netherlands': 'dash',
+    'Poland': 'dot',
+    'Portugal': 'dashdot',
+    'Qatar': 'longdash',
+    'Saudi Arabia': 'longdashdot',
+    'Senegal': 'solid',
+    'Serbia': 'dash',
+    'Spain': 'dot',
+    'Switzerland': 'dashdot',
+    'Tunisia': 'longdash',
+    'United States': 'longdashdot',
+    'Uruguay': 'solid',
+    'Wales': 'dash'
+}
+
+# Simplified symbol mapping for scatter plots
+# Using a smaller set of solid shapes (no hollow shapes or triangles)
+TEAM_SYMBOLS = {
+    'Argentina': 'circle',
+    'Australia': 'square',
+    'Belgium': 'diamond',
+    'Brazil': 'cross',
+    'Cameroon': 'x',
+    'Canada': 'star',
+    'Costa Rica': 'circle',
+    'Croatia': 'square',
+    'Denmark': 'diamond',
+    'Ecuador': 'cross',
+    'England': 'x',
+    'France': 'star',
+    'Germany': 'circle',
+    'Ghana': 'square',
+    'Iran': 'diamond', 
+    'Japan': 'cross',
+    'Korea Republic': 'x',
+    'Mexico': 'star',
+    'Morocco': 'circle',
+    'Netherlands': 'square',
+    'Poland': 'diamond',
+    'Portugal': 'cross',
+    'Qatar': 'x',
+    'Saudi Arabia': 'star',
+    'Senegal': 'circle',
+    'Serbia': 'square',
+    'Spain': 'diamond',
+    'Switzerland': 'cross',
+    'Tunisia': 'x',
+    'United States': 'star',
+    'Uruguay': 'circle',
+    'Wales': 'square'
+}
+
+def get_team_color(team, fallback_colors=None):
+    """Get a consistent color for a team, with fallback to a generated color if needed"""
+    if team in TEAM_COLORS:
+        return TEAM_COLORS[team]
+    
+    # If we don't have a pre-defined color, generate one
+    if fallback_colors and team in fallback_colors:
+        return fallback_colors[team]
+        
+    # Last resort: generate a random color
+    h = hash(team) % 360 / 360.0
+    r, g, b = colorsys.hsv_to_rgb(h, 0.9, 0.9)
+    return f'rgba({int(r*255)},{int(g*255)},{int(b*255)},0.85)'
+
+def get_team_pattern(team):
+    """Get a consistent dash pattern for a team"""
+    if team in TEAM_PATTERNS:
+        return TEAM_PATTERNS[team]
+    return 'solid'  # Default
+
+def get_team_symbol(team):
+    """Get a consistent symbol for a team"""
+    if team in TEAM_SYMBOLS:
+        return TEAM_SYMBOLS[team]
+    return 'circle'  # Default
 
 def load_team_data():
     """

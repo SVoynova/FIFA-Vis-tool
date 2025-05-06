@@ -58,17 +58,38 @@ def render(app: Dash) -> html.Div:
                         id=ids.TEAMS_DROPDOWN,
                         options=[{"label": team, "value": team} for team in teams],
                         multi=True,
-                        placeholder="Select teams to highlight",
+                        placeholder="Select teams to highlight across all charts",
                         value=[],
                         searchable=True,
                         clearable=True,
-                        style={"width": "100%"}
+                        style={
+                            "width": "100%",
+                            "font-size": "16px",
+                        },
+                        className="custom-dropdown"
                     )
-                ], width=8),
+                ], width=12),
+            ], className="mb-2"),
+            dbc.Row([
                 dbc.Col([
-                    dbc.Button("Select All", id=ids.SELECT_ALL_TEAMS, color="primary", size="sm", className="me-2"),
-                    dbc.Button("Deselect All", id=ids.DESELECT_ALL_TEAMS, color="secondary", size="sm")
-                ], width=4, className="d-flex align-items-center")
+                    dbc.ButtonGroup([
+                        dbc.Button(
+                            "Select All", 
+                            id=ids.SELECT_ALL_TEAMS, 
+                            color="primary", 
+                            size="sm", 
+                            className="me-2",
+                            style={"width": "120px", "font-weight": "bold"}
+                        ),
+                        dbc.Button(
+                            "Deselect All", 
+                            id=ids.DESELECT_ALL_TEAMS, 
+                            color="secondary", 
+                            size="sm",
+                            style={"width": "120px", "font-weight": "bold"}
+                        ),
+                    ], className="d-flex justify-content-center")
+                ], width=12, className="text-center")
             ])
         ]
     )

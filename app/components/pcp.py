@@ -12,208 +12,224 @@ import pandas as pd
 import numpy as np
 import os
 import colorsys
-
 from . import ids
+from . import data_utils  # Import shared data utilities
+from . import team_radar_task2  # Import to use the same color palette
 
 # Define the data path relative to the app root
 DATA_PATH = os.path.join('data', 'cleaned')  # Path to the data folder
 
 # Utility functions
 def load_team_data():
-    """Load team data from CSV file"""
-    try:
-        file_path = os.path.join(DATA_PATH, "team_data_clean.csv")
-        df = pd.read_csv(file_path)
-        return df
-    except Exception as e:
-        print(f"Error loading team data: {e}")
-        return None
-
-def generate_distinct_colors(n):
-    """Generate n visually distinct colors"""
-    hsv_colors = [(i/n, 0.9, 0.9) for i in range(n)]
-    rgb_colors = [colorsys.hsv_to_rgb(h, s, v) for h, s, v in hsv_colors]
-    # Convert to rgba with 0.85 alpha
-    rgba_colors = [f'rgba({int(r*255)},{int(g*255)},{int(b*255)},0.85)' for r, g, b in rgb_colors]
-    return rgba_colors
+    """Load and prepare team data"""
+    DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'cleaned')
+    file_path = os.path.join(DATA_PATH, "team_data_clean.csv")
+    
+    # Load data
+    df = pd.read_csv(file_path)
+    
+    # Select columns for PCP - using columns that actually exist in the dataset
+    selected_columns = [
+        'team', 
+        'possession',               # Possession %
+        'shots_per90',              # Shots per 90
+        'goals_per90',              # Goals per 90
+        'assists_per90',            # Assists per 90
+        'passes_pct',               # Pass Completion %
+        'passes_pct_short',         # Short Pass %
+        'passes_pct_medium',        # Medium Pass %
+        'passes_pct_long',          # Long Pass %
+        'tackles_interceptions',    # Tackles + Interceptions
+        'gk_save_pct',              # Save %
+        'games'                     # Keep games for potential calculations
+    ]
+    
+    # Filter to selected columns and remove any rows with NaN values
+    df = df[selected_columns].dropna()
+    
+    return df
 
 def render(app: Dash) -> html.Div:
+    """Render the parallel coordinates plot"""
+    
     @callback(
         Output(ids.PCP, "figure"),
-        [Input(ids.TEAMS_DROPDOWN, "value"),
-         Input(ids.SCATTER_PLOT, "selectedData"),
-         Input(ids.CLEAR_PCP_BUTTON, "n_clicks")]
+        [Input(ids.TEAMS_DROPDOWN, "value")]
     )
-    def update_pcp(selected_teams, selected_data, n_clicks):
+    def update_pcp(selected_teams):
         # Load the data
         df = load_team_data()
         
-        if df is None:
-            return go.Figure().update_layout(
-                title="Error loading data",
-                xaxis_title="Error",
-                yaxis_title="Error"
-            )
-            
-        # Process teams selected from scatter plot
-        scatter_selected_teams = []
-        if selected_data and 'points' in selected_data:
-            for point in selected_data['points']:
-                if 'customdata' in point and len(point['customdata']) > 0:
-                    team = point['customdata'][0]
-                    if team not in scatter_selected_teams:
-                        scatter_selected_teams.append(team)
+        # Get the colorblind-friendly palette from the radar chart
+        colorblind_palette = team_radar_task2.COLORBLIND_PALETTE
         
-        # Combine teams from dropdown and scatter plot
-        if selected_teams:
-            combined_teams = list(selected_teams)
-        else:
-            combined_teams = []
-            
-        # Add scatter plot selected teams
-        for team in scatter_selected_teams:
-            if team not in combined_teams:
-                combined_teams.append(team)
+        # Create the figure
+        fig = go.Figure()
         
-        # Define the attributes for the PCP - ordered by logical flow
-        attributes = [
-            'possession', 
-            'passes_pct',
-            'passes_pct_short', 
-            'passes_pct_medium', 
-            'passes_pct_long',
-            'shots_per90', 
-            'goals_per90', 
-            'assists_per90', 
-            'tackles_interceptions', 
-            'gk_save_pct'
+        # Select attributes for the parallel coordinates - using columns that exist
+        attrs = [
+            'possession',               # Possession %
+            'shots_per90',              # Shots per 90
+            'goals_per90',              # Goals per 90
+            'assists_per90',            # Assists per 90
+            'passes_pct',               # Pass Completion %
+            'passes_pct_short',         # Short Pass %
+            'passes_pct_medium',        # Medium Pass %
+            'passes_pct_long',          # Long Pass %
+            'tackles_interceptions',    # Tackles + Interceptions
+            'gk_save_pct'               # Save %
         ]
         
-        # Nice labels for attributes with units
+        # Labels for better readability
         labels = {
-            'possession': 'Possession (%)',
-            'passes_pct': 'Pass Completion (%)',
-            'passes_pct_short': 'Short Pass (%)',
-            'passes_pct_medium': 'Medium Pass (%)',
-            'passes_pct_long': 'Long Pass (%)',
+            'possession': 'Possession %',
             'shots_per90': 'Shots per 90',
             'goals_per90': 'Goals per 90',
             'assists_per90': 'Assists per 90',
-            'tackles_interceptions': 'Tackles + Int.',
-            'gk_save_pct': 'Save (%)'
+            'passes_pct': 'Pass Completion %',
+            'passes_pct_short': 'Short Pass %',
+            'passes_pct_medium': 'Medium Pass %',
+            'passes_pct_long': 'Long Pass %',
+            'tackles_interceptions': 'Tackles + Interceptions',
+            'gk_save_pct': 'Save %'
         }
         
-        # Filter data to only include columns we need
-        available_attrs = [col for col in attributes if col in df.columns]
-        if len(available_attrs) == 0:
-            return go.Figure().update_layout(
-                title="Error: No matching columns found in dataset",
-                height=600
+        # Set tick formats with appropriate precision
+        tick_formats = {
+            'possession': '.1f',
+            'shots_per90': '.2f',
+            'goals_per90': '.2f',
+            'assists_per90': '.2f',
+            'passes_pct': '.1f',
+            'passes_pct_short': '.1f',
+            'passes_pct_medium': '.1f',
+            'passes_pct_long': '.1f',
+            'tackles_interceptions': '.1f',
+            'gk_save_pct': '.1f'
+        }
+        
+        # Process the data based on team selection
+        if not selected_teams or len(selected_teams) == 0:
+            # No teams selected - show empty plot with prompt
+            fig.add_annotation(
+                text="Select teams above to visualize their performance",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5,
+                showarrow=False,
+                font=dict(size=18, color="#666666")
+            )
+        else:
+            # Filter for selected teams
+            selected_df = df[df['team'].isin(selected_teams)].copy()
+            
+            # Prepare team color mapping using the colorblind palette
+            team_colors = {}
+            for i, team in enumerate(selected_teams):
+                color_idx = i % len(colorblind_palette)
+                team_colors[team] = colorblind_palette[color_idx]
+            
+            # Create color array for PCP lines based on team index
+            color_array = list(range(len(selected_df)))
+            # Create colorscale mapping team indices to their colors
+            colorscale = [[i/len(selected_df), team_colors[team]] 
+                          for i, team in enumerate(selected_df['team'])]
+            
+            # Create dimensions for PCP
+            dimensions = []
+            for attr in attrs:
+                min_val = max(0, selected_df[attr].min() * 0.9)  # Prevent negative values
+                max_val = selected_df[attr].max() * 1.1  # Add buffer
+                tick_format = tick_formats.get(attr, '.1f')
+                
+                # Step size calculation for nice ticks
+                step = (max_val - min_val) / 5  # 5 ticks
+                
+                # Generate tick values
+                tick_values = [min_val + i * step for i in range(6)]
+                
+                # Create dimension specification
+                dimensions.append(
+                    dict(
+                        range=[min_val, max_val],
+                        label=labels.get(attr, attr.replace('_', ' ').title()),
+                        values=selected_df[attr].tolist(),
+                        tickvals=tick_values,
+                        ticktext=[f"{v:.1f}" for v in tick_values],
+                        tickformat=tick_format  # Using tickformat instead of tickfont
+                    )
+                )
+            
+            # Add the parallel coordinates trace
+            fig.add_trace(
+                go.Parcoords(
+                    line=dict(
+                        color=color_array,
+                        colorscale=colorscale,
+                        showscale=False
+                    ),
+                    dimensions=dimensions,
+                    labelangle=0,
+                    labelfont=dict(size=14, family="Arial", color="#333333"),
+                    rangefont=dict(size=11, family="Arial", color="#666666"),
+                )
             )
             
-        # Create a filtered dataframe
-        plot_df = df[['team'] + available_attrs].copy()
-        plot_df = plot_df.fillna(0)
-        
-        # Create a color array for teams
-        if combined_teams:
-            # Generate distinct colors for selected teams
-            team_colors = generate_distinct_colors(len(combined_teams))
-            color_dict = {team: team_colors[i] for i, team in enumerate(combined_teams)}
+            # Add hidden individual scatter traces for each attribute to enable hover
+            # They'll be positioned at the bottom of the plot and invisible
+            x_positions = list(range(len(attrs)))
             
-            # Set color values - numerical 0 for non-selected teams, 1-len for selected (for color mapping)
-            color_array = []
-            for team in plot_df['team']:
-                if team in combined_teams:
-                    # Index in the combined_teams list + 1 (to start at 1, not 0)
-                    color_array.append(combined_teams.index(team) + 1)
-                else:
-                    color_array.append(0)  # 0 for non-selected teams
+            for i, team in enumerate(selected_df['team']):
+                team_row = selected_df[selected_df['team'] == team].iloc[0]
+                team_color = team_colors[team]
+                
+                # For each attribute, add a hidden marker with hover text
+                for j, attr in enumerate(attrs):
+                    # Format the value based on the attribute
+                    format_str = tick_formats.get(attr, '.1f')
+                    value = team_row[attr]
+                    formatted_value = f"{value:{format_str}}"
                     
-            # Create a colorscale that maps 0 to very light gray
-            # and 1 through len(combined_teams) to distinct colors
-            colorscale = [[0, 'rgba(220,220,220,0.1)']]  # Very light gray for non-selected
-            for i, team in enumerate(combined_teams):
-                # Map (i+1)/len(combined_teams) to the team color
-                colorscale.append([(i+1)/len(combined_teams), color_dict[team]])
-        else:
-            # Default color array - all teams medium gray
-            color_array = [1] * len(plot_df)
-            colorscale = [[0, 'rgba(80,80,80,0.7)'], [1, 'rgba(80,80,80,0.7)']]
-        
-        # Create dimensions list for the parallel coordinates
-        dimensions = []
-        for attr in available_attrs:
-            min_val = plot_df[attr].min()
-            max_val = plot_df[attr].max()
+                    # Create hover text showing team and all values
+                    hover_text = f"<b>{team}</b><br>{labels[attr]}: {formatted_value}"
+                    
+                    # Add invisible scatter point for hover
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[x_positions[j]],
+                            y=[team_row[attr]],
+                            mode="markers",
+                            marker=dict(
+                                color=team_color,
+                                opacity=0,  # Invisible
+                                size=15     # Large hit area for hover
+                            ),
+                            hoverinfo="text",
+                            hovertext=hover_text,
+                            showlegend=False
+                        )
+                    )
             
-            # Add a small buffer to the range
-            buffer = (max_val - min_val) * 0.05 if max_val > min_val else 0.1
-            
-            # Use a format appropriate for the metric
-            tick_format = '.0f'  # Default format
-            if 'pct' in attr:
-                tick_format = '.0f'  # Integer percentage
-            elif 'per90' in attr:
-                tick_format = '.2f'  # Two decimal places for per90 stats
+            # Create a separate legend showing teams
+            for i, team in enumerate(selected_teams):
+                color_idx = i % len(colorblind_palette)
+                team_color = colorblind_palette[color_idx]
                 
-            dimensions.append(
-                dict(
-                    range=[min_val - buffer, max_val + buffer],
-                    label=labels.get(attr, attr.replace('_', ' ').title()),
-                    values=plot_df[attr].tolist(),
-                    tickformat=tick_format
-                )
-            )
-        
-        # Create the figure with a single trace
-        fig = go.Figure(data=
-            go.Parcoords(
-                line=dict(
-                    color=color_array,
-                    colorscale=colorscale,
-                    showscale=False,
-                ),
-                dimensions=dimensions,
-                labelangle=30,
-                labelfont=dict(size=14, family="Arial", color="#ffffff"),
-                tickfont=dict(size=11, family="Arial", color="#dddddd")
-            )
-        )
-        
-        # Add a team selector legend
-        legend_items = []
-        if combined_teams:
-            legend_items = []
-            for i, team in enumerate(combined_teams[:15]):  # Limit to 15 teams
-                color = color_dict[team]
-                legend_items.append(
-                    html.Div([
-                        html.Div(style={
-                            "backgroundColor": color,
-                            "width": "15px",
-                            "height": "15px",
-                            "display": "inline-block",
-                            "marginRight": "5px",
-                            "verticalAlign": "middle"
-                        }),
-                        html.Span(team, style={"color": "white", "fontSize": "12px"})
-                    ], style={"marginBottom": "3px", "marginRight": "10px", "display": "inline-block"})
-                )
-                
-            if len(combined_teams) > 15:
-                legend_items.append(
-                    html.Div(f"... and {len(combined_teams) - 15} more teams", 
-                             style={"color": "white", "fontSize": "12px", "marginTop": "5px"})
+                # Add a scatter trace just for the legend
+                fig.add_trace(
+                    go.Scatter(
+                        x=[None], 
+                        y=[None],
+                        mode='lines',
+                        line=dict(
+                            color=team_color,
+                            width=4,  # Make lines thick in legend
+                        ),
+                        name=team,
+                        showlegend=True
+                    )
                 )
         
-        # Create legend title
-        if combined_teams:
-            legend_title = f"Selected Teams ({len(combined_teams)})"
-        else:
-            legend_title = "All Teams"
-            
-        # Update layout with improved styling
+        # Update layout with white background and improved styling
         fig.update_layout(
             title={
                 'text': "Team Performance Comparison",
@@ -221,149 +237,102 @@ def render(app: Dash) -> html.Div:
                 'x': 0.5,
                 'xanchor': 'center',
                 'yanchor': 'top',
-                'font': {'size': 24, 'color': 'white'}
+                'font': {'size': 24, 'color': '#333333'}
             },
-            plot_bgcolor='rgba(25,25,25,1)',   # Dark background
-            paper_bgcolor='rgba(25,25,25,1)',  # Dark background
-            height=750,  # Taller for better visibility
-            margin=dict(l=100, r=100, t=120, b=80),
+            plot_bgcolor='rgba(255,255,255,1)',   # White background
+            paper_bgcolor='rgba(255,255,255,1)',  # White background
+            height=700,  # Taller for better visibility
+            margin=dict(l=80, r=80, t=100, b=100),  # Margins
+            
+            # Move legend outside and below the plot
+            legend=dict(
+                font=dict(size=14, color="#333333"),  # Larger, darker font
+                orientation="h",
+                yanchor="top",
+                y=-0.12,  # Place below the plot
+                xanchor="center",
+                x=0.5,
+                bordercolor='rgba(0, 0, 0, 0.2)',
+                borderwidth=2,
+                bgcolor='rgba(255, 255, 255, 0.95)'
+            ),
+            hovermode="closest"  # For better hover interaction
         )
         
         return fig
-        
-    @callback(
-        Output("pcp-info", "children"),
-        [Input(ids.TEAMS_DROPDOWN, "value"),
-         Input(ids.SCATTER_PLOT, "selectedData")]
-    )
-    def update_pcp_info(selected_teams, selected_data):
-        # Count teams from dropdown
-        dropdown_count = len(selected_teams) if selected_teams else 0
-        
-        # Count teams from scatter plot
-        scatter_count = 0
-        unique_teams = set()
-        if selected_data and 'points' in selected_data:
-            for point in selected_data['points']:
-                if 'customdata' in point and len(point['customdata']) > 0:
-                    team = point['customdata'][0]
-                    if team not in unique_teams:
-                        unique_teams.add(team)
-                        scatter_count += 1
-        
-        # Determine total unique teams
-        total_unique = 0
-        if dropdown_count > 0 and scatter_count > 0:
-            # Calculate overlap
-            if selected_teams:
-                scatter_teams = list(unique_teams)
-                total_unique = len(set(selected_teams).union(set(scatter_teams)))
-            else:
-                total_unique = scatter_count
-        else:
-            total_unique = dropdown_count + scatter_count
-            
-        # Create info text
-        if total_unique == 0:
-            return "No teams selected. Use the dropdown above or click points on the scatter plot to select teams."
-        elif total_unique == 1:
-            return f"1 team selected"
-        else:
-            return f"{total_unique} teams selected"
     
-    # Callback to generate the legend display
+    # Generate legend content for selected teams
     @callback(
         Output("pcp-legend", "children"),
-        [Input(ids.TEAMS_DROPDOWN, "value"),
-         Input(ids.SCATTER_PLOT, "selectedData")]
+        [Input(ids.TEAMS_DROPDOWN, "value")]
     )
-    def update_legend(selected_teams, selected_data):
-        # Process teams selected from scatter plot
-        scatter_selected_teams = []
-        if selected_data and 'points' in selected_data:
-            for point in selected_data['points']:
-                if 'customdata' in point and len(point['customdata']) > 0:
-                    team = point['customdata'][0]
-                    if team not in scatter_selected_teams:
-                        scatter_selected_teams.append(team)
+    def update_legend(selected_teams):
+        if not selected_teams or len(selected_teams) == 0:
+            return html.Div([
+                html.H6("No Teams Selected", className="mb-2 text-center"),
+                html.P("Select teams above to visualize them in the plot.", className="text-center text-muted")
+            ])
         
-        # Combine teams from dropdown and scatter plot
-        if selected_teams:
-            combined_teams = list(selected_teams)
-        else:
-            combined_teams = []
-            
-        # Add scatter plot selected teams
-        for team in scatter_selected_teams:
-            if team not in combined_teams:
-                combined_teams.append(team)
-                
-        # Generate distinct colors for teams
-        if combined_teams:
-            team_colors = generate_distinct_colors(len(combined_teams))
-            
-            # Build legend items
-            legend_items = []
-            for i, team in enumerate(combined_teams[:15]):  # Limit to 15 teams
-                color = team_colors[i]
-                legend_items.append(
-                    html.Div([
-                        html.Div(style={
-                            "backgroundColor": color,
-                            "width": "15px",
-                            "height": "15px",
-                            "display": "inline-block",
-                            "marginRight": "5px",
-                            "verticalAlign": "middle"
-                        }),
-                        html.Span(team, style={"fontSize": "12px"})
-                    ], style={"marginBottom": "3px", "marginRight": "10px", "display": "inline-block"})
-                )
-                
-            if len(combined_teams) > 15:
-                legend_items.append(
-                    html.Div(f"... and {len(combined_teams) - 15} more teams", 
-                             style={"fontSize": "12px", "marginTop": "5px"})
-                )
-                
-            return html.Div([
-                html.H6(f"Selected Teams ({len(combined_teams)})", className="mb-2"),
-                html.Div(legend_items, style={
-                    "display": "flex", 
-                    "flexWrap": "wrap", 
-                    "maxWidth": "100%"
-                })
-            ])
-        else:
-            return html.Div([
-                html.H6("No Teams Selected", className="mb-2"),
-                html.P("Use the dropdown above or click points on the scatter plot to select teams.")
-            ])
+        # Build legend items using consistent team colors
+        legend_items = []
+        for team in selected_teams[:15]:  # Limit to 15 teams for display
+            color = data_utils.get_team_color(team)
+            legend_items.append(
+                html.Div([
+                    html.Div(style={
+                        "backgroundColor": color,
+                        "width": "16px",
+                        "height": "16px",
+                        "display": "inline-block",
+                        "marginRight": "8px",
+                        "verticalAlign": "middle",
+                        "borderRadius": "3px"
+                    }),
+                    html.Span(team, style={"fontSize": "14px"})
+                ], style={"marginBottom": "4px", "marginRight": "15px", "display": "inline-block"})
+            )
+        
+        # Add indicator if more teams are selected than shown
+        if len(selected_teams) > 15:
+            legend_items.append(
+                html.Div(f"... and {len(selected_teams) - 15} more teams", 
+                         style={"fontSize": "14px", "marginTop": "10px", "fontStyle": "italic"})
+            )
+        
+        return html.Div([
+            html.H6(f"Selected Teams ({len(selected_teams)})", className="text-center mb-3"),
+            html.Div(legend_items, style={
+                "display": "flex", 
+                "flexWrap": "wrap", 
+                "justifyContent": "center",
+                "maxWidth": "100%"
+            })
+        ], className="bg-light p-3 rounded shadow-sm")
     
-    return html.Div(
-        children=[
-            dbc.Row([
-                dbc.Col([
-                    dcc.Graph(
-                        id=ids.PCP, 
-                        figure={},
-                        config={'displayModeBar': False},
-                        style={"backgroundColor": "#191919"}
-                    ),
-                ], width=12),
-                dbc.Col([
-                    dbc.Button("Clear Selection", id=ids.CLEAR_PCP_BUTTON, 
-                              color="danger", className="mt-3 mb-2"),
-                    html.Div(id="pcp-info", className="text-muted mt-2", 
-                            style={"fontSize": "0.9rem"})
-                ], width=12, className="text-center"),
-                dbc.Col([
-                    html.Div(id="pcp-legend", className="mt-3 mb-2",
-                            style={"backgroundColor": "#f8f9fa", 
-                                  "padding": "10px",
-                                  "borderRadius": "5px"})
-                ], width=12)
-            ])
-        ],
-        style={"backgroundColor": "#191919", "padding": "15px", "borderRadius": "10px"}
-    )
+    # Create the main component
+    return html.Div([
+        dbc.Row([
+            dbc.Col([
+                html.Div(id="pcp-legend", className="mb-3")
+            ], width=12),
+        ]),
+        html.Div([
+            dbc.Button(
+                "Clear Selection",
+                id=ids.CLEAR_PCP_BUTTON,
+                color="secondary",
+                size="sm",
+                className="mb-3",
+                style={"fontWeight": "bold"}
+            ),
+        ], className="text-center"),
+        dbc.Spinner(
+            dcc.Graph(
+                id=ids.PCP, 
+                className="border rounded shadow",
+                config={'displayModeBar': True}
+            ),
+            color="primary",
+            type="border",
+        )
+    ])
