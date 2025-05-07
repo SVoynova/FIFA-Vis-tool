@@ -49,9 +49,24 @@ def load_team_data():
     
     return df
 
+def bin_column(series, bins=3, labels=None):
+    # Bin a continuous column into categories
+    if labels is None:
+        labels = ["Low", "Medium", "High"][:bins]
+    return pd.cut(series, bins=bins, labels=labels)
+
+def bin_column_with_ranges(series, bins=3):
+    # Bin a continuous column into value ranges (e.g., 10-20)
+    binned, bin_edges = pd.cut(series, bins=bins, retbins=True)
+    labels = []
+    for i in range(len(bin_edges)-1):
+        left = bin_edges[i]
+        right = bin_edges[i+1]
+        labels.append(f"{left:.1f}–{right:.1f}")
+    return pd.cut(series, bins=bin_edges, labels=labels, include_lowest=True)
+
 def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.Div:
-    """Render the parallel coordinates plot"""
-    
+    """Render the parallel coordinates plot and a parallel categories plot above it"""
     @callback(
         Output(ids.PCP, "figure"),
         [Input(ids.TEAMS_DROPDOWN, "value")] +
@@ -98,8 +113,8 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
             team_colors = {team: colorblind_palette[i % len(colorblind_palette)] for i, team in enumerate(selected_teams)}
             color_array = [i for i, team in enumerate(selected_df['team'])]
             colorscale = [[i / max(1, len(selected_df) - 1), team_colors[team]] for i, team in enumerate(selected_df['team'])]
-            # Highlight style
-            highlight_style = '<span style="color:#1a237e;font-weight:bold;text-shadow:0 0 6px #bbdefb;">{}</span>'
+            # PCP highlight style: prefix with '🔵' and bold using <b>...</b>
+            highlight_style = '<b>🔵 {}</b>'
             # Create dimensions for PCP
             dimensions = []
             for attr in attrs:
@@ -111,7 +126,7 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
                 # Highlight label if matches x_axis or y_axis
                 label_html = labels.get(attr, attr.replace('_', ' ').title())
                 if (x_axis and attr == x_axis) or (y_axis and attr == y_axis):
-                    label_html = highlight_style.format(label_html)
+                    label_html = f'<b>🔵 {label_html.upper()}</b>'
                 dimensions.append(
                     dict(
                         range=[min_val, max_val],
@@ -225,7 +240,7 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
         
         # Build legend items using consistent team colors
         legend_items = []
-        for team in selected_teams[:15]:  # Limit to 15 teams for display
+        for team in selected_teams:
             color = data_utils.get_team_color(team)
             legend_items.append(
                 html.Div([
@@ -242,13 +257,6 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
                 ], style={"marginBottom": "4px", "marginRight": "15px", "display": "inline-block"})
             )
         
-        # Add indicator if more teams are selected than shown
-        if len(selected_teams) > 15:
-            legend_items.append(
-                html.Div(f"... and {len(selected_teams) - 15} more teams", 
-                         style={"fontSize": "14px", "marginTop": "10px", "fontStyle": "italic"})
-            )
-        
         return html.Div([
             html.H6(f"Selected Teams ({len(selected_teams)})", className="text-center mb-3"),
             html.Div(legend_items, style={
@@ -259,8 +267,93 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
             })
         ], className="bg-light p-3 rounded shadow-sm")
     
-    # Create the main component
+    # --- Parallel Categories Plot ---
+    @callback(
+        Output('parcats-plot', 'figure'),
+        [Input(ids.TEAMS_DROPDOWN, 'value')] +
+        ([Input(x_axis_dropdown_id, "value")] if x_axis_dropdown_id else []) +
+        ([Input(y_axis_dropdown_id, "value")] if y_axis_dropdown_id else [])
+    )
+    def update_parcats(selected_teams, x_axis=None, y_axis=None):
+        df = load_team_data()
+        if not selected_teams or len(selected_teams) == 0:
+            return go.Figure()
+        selected_df = df[df['team'].isin(selected_teams)].copy()
+        attrs = [
+            'possession', 'shots_per90', 'goals_per90', 'assists_per90',
+            'passes_pct', 'passes_pct_short', 'passes_pct_medium', 'passes_pct_long',
+            'tackles_interceptions', 'gk_save_pct'
+        ]
+        labels = {
+            'possession': 'Possession %',
+            'shots_per90': 'Shots per 90',
+            'goals_per90': 'Goals per 90',
+            'assists_per90': 'Assists per 90',
+            'passes_pct': 'Pass Completion %',
+            'passes_pct_short': 'Short Pass %',
+            'passes_pct_medium': 'Medium Pass %',
+            'passes_pct_long': 'Long Pass %',
+            'tackles_interceptions': 'Tackles + Interceptions',
+            'gk_save_pct': 'Save %'
+        }
+        # Use actual values (rounded) for each metric as categories
+        def round_series(series):
+            # Use 2 decimals for floats, int otherwise
+            if pd.api.types.is_float_dtype(series):
+                return series.round(2)
+            return series
+        # Build team-to-color mapping based on the order of selected_teams (same as PCP)
+        colorblind_palette = team_radar_task2.COLORBLIND_PALETTE
+        team_color_map = {team: colorblind_palette[i % len(colorblind_palette)] for i, team in enumerate(selected_teams)}
+        team_color_list = [team_color_map[team] for team in selected_df['team']]
+        # Build dimensions for parcats (convert all values to strings)
+        dimensions = [
+            dict(values=selected_df['team'].astype(str), label='Team', categoryorder='array', categoryarray=[str(t) for t in selected_df['team'].tolist()])
+        ]
+        for attr in attrs:
+            rounded_vals = round_series(selected_df[attr]).astype(str)
+            unique_vals = sorted(rounded_vals.unique())
+            label_html = labels[attr]
+            if (x_axis is not None and attr == x_axis) or (y_axis is not None and attr == y_axis):
+                label_html = f'🔵 {label_html.upper()}'
+            dimensions.append(dict(
+                values=rounded_vals,
+                label=label_html,
+                categoryorder='array',
+                categoryarray=unique_vals,
+                ticktext=[str(v) for v in unique_vals]
+            ))
+        fig = go.Figure(
+            go.Parcats(
+                dimensions=dimensions,
+                line=dict(color=team_color_list),
+                hoveron='category',
+                arrangement='freeform',
+                labelfont=dict(size=14, family="Arial", color="#333333"),
+                bundlecolors=False,
+                domain=dict(y=[0, 1])
+            )
+        )
+        fig.update_layout(
+            title={
+                'text': "Parallel Categories Plot (Binned Metrics)",
+                'y': 0.98,
+                'x': 0.5,
+                'xanchor': 'center',
+                'yanchor': 'top',
+                'font': {'size': 22, 'color': '#333333'}
+            },
+            margin=dict(l=40, r=40, t=60, b=40),
+            height=700,
+            plot_bgcolor='rgba(255,255,255,1)',
+            paper_bgcolor='rgba(255,255,255,1)'
+        )
+        return fig
+
+    # --- Layout ---
     return html.Div([
+        dcc.Graph(id='parcats-plot', className="mb-4 border rounded shadow-sm"),
+        # (existing PCP legend, controls, and PCP plot below)
         dbc.Row([
             dbc.Col([
                 html.Div(id="pcp-legend", className="mb-3")

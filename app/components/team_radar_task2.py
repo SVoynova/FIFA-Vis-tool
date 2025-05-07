@@ -160,8 +160,8 @@ def render(app: Dash) -> html.Div:
             legend=dict(
                 font=dict(size=11),
                 orientation="h",
-                yanchor="bottom", 
-                y=-0.15,
+                yanchor="top",
+                y=-0.25,
                 xanchor="center",
                 x=0.5,
                 bgcolor='rgba(255, 255, 255, 0.9)',
@@ -171,7 +171,7 @@ def render(app: Dash) -> html.Div:
             title="Team Performance Radar Chart",
             title_x=0.5,
             title_font=dict(size=15),
-            margin=dict(t=50, l=40, r=40, b=100),
+            margin=dict(t=50, l=40, r=40, b=180),
             height=550,
             paper_bgcolor='rgba(250, 250, 250, 0.9)'
         )
