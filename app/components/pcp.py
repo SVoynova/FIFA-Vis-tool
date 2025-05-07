@@ -296,40 +296,67 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
             'tackles_interceptions': 'Tackles + Interceptions',
             'gk_save_pct': 'Save %'
         }
-        # Use actual values (rounded) for each metric as categories
-        def round_series(series):
-            # Use 2 decimals for floats, int otherwise
-            if pd.api.types.is_float_dtype(series):
-                return series.round(2)
-            return series
+
+        # Define meaningful categories for each metric
+        def create_categories(series, metric):
+            if metric == 'possession':
+                bins = [0, 40, 50, 60, 100]
+                labels = ['Low (<40%)', 'Below Avg (40-50%)', 'Above Avg (50-60%)', 'High (>60%)']
+            elif metric == 'shots_per90':
+                bins = [0, 10, 13, 16, 100]
+                labels = ['Low (<10)', 'Below Avg (10-13)', 'Above Avg (13-16)', 'High (>16)']
+            elif metric == 'goals_per90':
+                bins = [0, 1.2, 1.5, 1.8, 100]
+                labels = ['Low (<1.2)', 'Below Avg (1.2-1.5)', 'Above Avg (1.5-1.8)', 'High (>1.8)']
+            elif metric == 'assists_per90':
+                bins = [0, 0.8, 1.0, 1.2, 100]
+                labels = ['Low (<0.8)', 'Below Avg (0.8-1.0)', 'Above Avg (1.0-1.2)', 'High (>1.2)']
+            elif metric in ['passes_pct', 'passes_pct_short', 'passes_pct_medium', 'passes_pct_long']:
+                bins = [0, 75, 80, 85, 100]
+                labels = ['Low (<75%)', 'Below Avg (75-80%)', 'Above Avg (80-85%)', 'High (>85%)']
+            elif metric == 'tackles_interceptions':
+                bins = [0, 15, 20, 25, 100]
+                labels = ['Low (<15)', 'Below Avg (15-20)', 'Above Avg (20-25)', 'High (>25)']
+            elif metric == 'gk_save_pct':
+                bins = [0, 65, 70, 75, 100]
+                labels = ['Low (<65%)', 'Below Avg (65-70%)', 'Above Avg (70-75%)', 'High (>75%)']
+            else:
+                return series.astype(str)
+            
+            return pd.cut(series, bins=bins, labels=labels, include_lowest=True)
+
         # Build team-to-color mapping based on the order of selected_teams (same as PCP)
         colorblind_palette = team_radar_task2.COLORBLIND_PALETTE
         team_color_map = {team: colorblind_palette[i % len(colorblind_palette)] for i, team in enumerate(selected_teams)}
         team_color_list = [team_color_map[team] for team in selected_df['team']]
-        # Build dimensions for parcats (convert all values to strings)
+
+        # Build dimensions for parcats
         dimensions = [
             dict(values=selected_df['team'].astype(str), label='Team', categoryorder='array', categoryarray=[str(t) for t in selected_df['team'].tolist()])
         ]
+        
         for attr in attrs:
-            rounded_vals = round_series(selected_df[attr]).astype(str)
-            unique_vals = sorted(rounded_vals.unique())
+            categorized_vals = create_categories(selected_df[attr], attr)
+            # Convert all values to strings before sorting
+            unique_vals = sorted([str(v) for v in categorized_vals.unique()])
             label_html = labels[attr]
             if (x_axis is not None and attr == x_axis) or (y_axis is not None and attr == y_axis):
                 label_html = f'🔵 {label_html.upper()}'
             dimensions.append(dict(
-                values=rounded_vals,
+                values=categorized_vals.astype(str),  # Ensure values are strings
                 label=label_html,
                 categoryorder='array',
                 categoryarray=unique_vals,
-                ticktext=[str(v) for v in unique_vals]
+                ticktext=unique_vals
             ))
+
         fig = go.Figure(
             go.Parcats(
                 dimensions=dimensions,
-                line=dict(color=team_color_list),
+                line=dict(color=team_color_list, shape='hspline'),
                 hoveron='category',
-                arrangement='freeform',
-                labelfont=dict(size=14, family="Arial", color="#333333"),
+                arrangement='perpendicular',
+                labelfont=dict(size=14, family="Courier New, monospace", color="#222"),
                 bundlecolors=False,
                 domain=dict(y=[0, 1])
             )
@@ -343,10 +370,15 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
                 'yanchor': 'top',
                 'font': {'size': 22, 'color': '#333333'}
             },
-            margin=dict(l=40, r=40, t=60, b=40),
+            margin=dict(l=100, r=100, t=80, b=60),  # Increased left and right margins
             height=700,
-            plot_bgcolor='rgba(255,255,255,1)',
-            paper_bgcolor='rgba(255,255,255,1)'
+            plot_bgcolor='#f5f5f5',
+            paper_bgcolor='#f5f5f5',
+            # Add padding between axes
+            xaxis=dict(
+                tickangle=45,  # Angle the labels
+                automargin=True  # Automatically adjust margins
+            )
         )
         return fig
 
