@@ -1,0 +1,88 @@
+/* Fade-in animation */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 1.2s ease;
+}
+
+/* Slide-in from bottom */
+@keyframes slideInUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.slide-in-up {
+  animation: slideInUp 1s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Animated header entrance */
+.animated-header {
+  animation: fadeIn 1.2s, slideInUp 1.2s;
+}
+
+/* Animated hover/focus for buttons */
+.btn, .dash-bootstrap .btn {
+  transition: background 0.3s, box-shadow 0.3s, transform 0.2s;
+}
+.btn:hover, .dash-bootstrap .btn:hover {
+  background: #1a237e !important;
+  color: #fff !important;
+  box-shadow: 0 4px 16px rgba(26,35,126,0.12);
+  transform: translateY(-2px) scale(1.04);
+}
+.btn:focus, .dash-bootstrap .btn:focus {
+  outline: 2px solid #3949ab !important;
+  box-shadow: 0 0 0 3px #c5cae9;
+}
+
+/* Dropdowns and cards */
+.custom-dropdown, .bg-light, .bg-white, .rounded, .shadow-sm {
+  transition: box-shadow 0.3s, background 0.3s;
+}
+.custom-dropdown:focus, .custom-dropdown:hover,
+.bg-light:hover, .bg-white:hover, .rounded:hover, .shadow-sm:hover {
+  box-shadow: 0 6px 24px rgba(26,35,126,0.10);
+  background: #f5f7fa;
+}
+
+/* Animated scroll-down indicator */
+.scroll-down-indicator {
+  display: flex;
+  justify-content: center;
+  margin-top: -18px;
+  margin-bottom: 18px;
+}
+.scroll-down-arrow {
+  width: 32px;
+  height: 32px;
+  border: solid #1a237e;
+  border-width: 0 4px 4px 0;
+  display: inline-block;
+  padding: 6px;
+  transform: rotate(45deg);
+  animation: bounceDown 1.5s infinite;
+}
+@keyframes bounceDown {
+  0%, 100% { transform: translateY(0) rotate(45deg); }
+  50% { transform: translateY(12px) rotate(45deg); }
+}
+
+/* Section highlight for sticky headers */
+.sticky-section-header {
+  background: #e3eafc;
+  box-shadow: 0 2px 8px rgba(26,35,126,0.04);
+  transition: background 0.3s;
+}
+
+/* Focus states for accessibility */
+*:focus {
+  outline: 2px solid #3949ab !important;
+  outline-offset: 2px;
+}
+
+/* Subtle shadow and color transitions */
+.dash-graph, .border, .rounded, .shadow-sm {
+  transition: box-shadow 0.3s, background 0.3s;
+} 

@@ -49,38 +49,25 @@ def load_team_data():
     
     return df
 
-def render(app: Dash) -> html.Div:
+def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.Div:
     """Render the parallel coordinates plot"""
     
     @callback(
         Output(ids.PCP, "figure"),
-        [Input(ids.TEAMS_DROPDOWN, "value")]
+        [Input(ids.TEAMS_DROPDOWN, "value")] +
+        ([Input(x_axis_dropdown_id, "value")] if x_axis_dropdown_id else []) +
+        ([Input(y_axis_dropdown_id, "value")] if y_axis_dropdown_id else [])
     )
-    def update_pcp(selected_teams):
+    def update_pcp(selected_teams, x_axis=None, y_axis=None):
         # Load the data
         df = load_team_data()
-        
-        # Get the colorblind-friendly palette from the radar chart
         colorblind_palette = team_radar_task2.COLORBLIND_PALETTE
-        
-        # Create the figure
         fig = go.Figure()
-        
-        # Select attributes for the parallel coordinates - using columns that exist
         attrs = [
-            'possession',               # Possession %
-            'shots_per90',              # Shots per 90
-            'goals_per90',              # Goals per 90
-            'assists_per90',            # Assists per 90
-            'passes_pct',               # Pass Completion %
-            'passes_pct_short',         # Short Pass %
-            'passes_pct_medium',        # Medium Pass %
-            'passes_pct_long',          # Long Pass %
-            'tackles_interceptions',    # Tackles + Interceptions
-            'gk_save_pct'               # Save %
+            'possession', 'shots_per90', 'goals_per90', 'assists_per90',
+            'passes_pct', 'passes_pct_short', 'passes_pct_medium', 'passes_pct_long',
+            'tackles_interceptions', 'gk_save_pct'
         ]
-        
-        # Labels for better readability
         labels = {
             'possession': 'Possession %',
             'shots_per90': 'Shots per 90',
@@ -93,24 +80,12 @@ def render(app: Dash) -> html.Div:
             'tackles_interceptions': 'Tackles + Interceptions',
             'gk_save_pct': 'Save %'
         }
-        
-        # Set tick formats with appropriate precision
         tick_formats = {
-            'possession': '.1f',
-            'shots_per90': '.2f',
-            'goals_per90': '.2f',
-            'assists_per90': '.2f',
-            'passes_pct': '.1f',
-            'passes_pct_short': '.1f',
-            'passes_pct_medium': '.1f',
-            'passes_pct_long': '.1f',
-            'tackles_interceptions': '.1f',
-            'gk_save_pct': '.1f'
+            'possession': '.1f', 'shots_per90': '.2f', 'goals_per90': '.2f',
+            'assists_per90': '.2f', 'passes_pct': '.1f', 'passes_pct_short': '.1f',
+            'passes_pct_medium': '.1f', 'passes_pct_long': '.1f', 'tackles_interceptions': '.1f', 'gk_save_pct': '.1f'
         }
-        
-        # Process the data based on team selection
         if not selected_teams or len(selected_teams) == 0:
-            # No teams selected - show empty plot with prompt
             fig.add_annotation(
                 text="Select teams above to visualize their performance",
                 xref="paper", yref="paper",
@@ -119,47 +94,34 @@ def render(app: Dash) -> html.Div:
                 font=dict(size=18, color="#666666")
             )
         else:
-            # Filter for selected teams
             selected_df = df[df['team'].isin(selected_teams)].copy()
-            
-            # Prepare team color mapping using the colorblind palette
-            team_colors = {}
-            for i, team in enumerate(selected_teams):
-                color_idx = i % len(colorblind_palette)
-                team_colors[team] = colorblind_palette[color_idx]
-            
-            # Create color array for PCP lines based on team index
-            color_array = list(range(len(selected_df)))
-            # Create colorscale mapping team indices to their colors
-            colorscale = [[i/len(selected_df), team_colors[team]] 
-                          for i, team in enumerate(selected_df['team'])]
-            
+            team_colors = {team: colorblind_palette[i % len(colorblind_palette)] for i, team in enumerate(selected_teams)}
+            color_array = [i for i, team in enumerate(selected_df['team'])]
+            colorscale = [[i / max(1, len(selected_df) - 1), team_colors[team]] for i, team in enumerate(selected_df['team'])]
+            # Highlight style
+            highlight_style = '<span style="color:#1a237e;font-weight:bold;text-shadow:0 0 6px #bbdefb;">{}</span>'
             # Create dimensions for PCP
             dimensions = []
             for attr in attrs:
-                min_val = max(0, selected_df[attr].min() * 0.9)  # Prevent negative values
-                max_val = selected_df[attr].max() * 1.1  # Add buffer
+                min_val = max(0, selected_df[attr].min() * 0.9)
+                max_val = selected_df[attr].max() * 1.1
                 tick_format = tick_formats.get(attr, '.1f')
-                
-                # Step size calculation for nice ticks
-                step = (max_val - min_val) / 5  # 5 ticks
-                
-                # Generate tick values
+                step = (max_val - min_val) / 5
                 tick_values = [min_val + i * step for i in range(6)]
-                
-                # Create dimension specification
+                # Highlight label if matches x_axis or y_axis
+                label_html = labels.get(attr, attr.replace('_', ' ').title())
+                if (x_axis and attr == x_axis) or (y_axis and attr == y_axis):
+                    label_html = highlight_style.format(label_html)
                 dimensions.append(
                     dict(
                         range=[min_val, max_val],
-                        label=labels.get(attr, attr.replace('_', ' ').title()),
+                        label=label_html,
                         values=selected_df[attr].tolist(),
                         tickvals=tick_values,
                         ticktext=[f"{v:.1f}" for v in tick_values],
-                        tickformat=tick_format  # Using tickformat instead of tickfont
+                        tickformat=tick_format
                     )
                 )
-            
-            # Add the parallel coordinates trace
             fig.add_trace(
                 go.Parcoords(
                     line=dict(
@@ -173,26 +135,16 @@ def render(app: Dash) -> html.Div:
                     rangefont=dict(size=11, family="Arial", color="#666666"),
                 )
             )
-            
             # Add hidden individual scatter traces for each attribute to enable hover
-            # They'll be positioned at the bottom of the plot and invisible
             x_positions = list(range(len(attrs)))
-            
             for i, team in enumerate(selected_df['team']):
                 team_row = selected_df[selected_df['team'] == team].iloc[0]
                 team_color = team_colors[team]
-                
-                # For each attribute, add a hidden marker with hover text
                 for j, attr in enumerate(attrs):
-                    # Format the value based on the attribute
                     format_str = tick_formats.get(attr, '.1f')
                     value = team_row[attr]
                     formatted_value = f"{value:{format_str}}"
-                    
-                    # Create hover text showing team and all values
                     hover_text = f"<b>{team}</b><br>{labels[attr]}: {formatted_value}"
-                    
-                    # Add invisible scatter point for hover
                     fig.add_trace(
                         go.Scatter(
                             x=[x_positions[j]],
@@ -201,28 +153,26 @@ def render(app: Dash) -> html.Div:
                             marker=dict(
                                 color=team_color,
                                 opacity=0,  # Invisible
-                                size=15     # Large hit area for hover
+                                size=15
                             ),
                             hoverinfo="text",
                             hovertext=hover_text,
                             showlegend=False
                         )
                     )
-            
+
             # Create a separate legend showing teams
             for i, team in enumerate(selected_teams):
                 color_idx = i % len(colorblind_palette)
                 team_color = colorblind_palette[color_idx]
-                
-                # Add a scatter trace just for the legend
                 fig.add_trace(
                     go.Scatter(
-                        x=[None], 
+                        x=[None],
                         y=[None],
                         mode='lines',
                         line=dict(
                             color=team_color,
-                            width=4,  # Make lines thick in legend
+                            width=4,
                         ),
                         name=team,
                         showlegend=True
