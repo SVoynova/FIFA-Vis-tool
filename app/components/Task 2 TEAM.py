@@ -2,8 +2,9 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import Dash, dcc, html, Input, Output
 
-# Load team performance scores
-df = pd.read_csv("C:/Users/zoli/Documents/Vis RESIT/Clean Data/team_performance_scores.csv")
+DATA_PATH = os.path.join('data', 'cleaned') 
+file_path = os.path.join(DATA_PATH, "team_performance_scores.csv")
+df = pd.read_csv(file_path)
 
 # Radar chart dimensions
 dimensions = ['Offensive', 'Defensive', 'Cohesion', 'Efficiency', 'Discipline']

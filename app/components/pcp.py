@@ -356,7 +356,7 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
                 line=dict(color=team_color_list, shape='hspline'),
                 hoveron='category',
                 arrangement='perpendicular',
-                labelfont=dict(size=14, family="Courier New, monospace", color="#222"),
+                labelfont=dict(size=12, family="Courier New, monospace", color="#222"),
                 bundlecolors=False,
                 domain=dict(y=[0, 1])
             )
