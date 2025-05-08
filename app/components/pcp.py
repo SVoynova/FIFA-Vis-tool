@@ -5,7 +5,7 @@ This component creates a visually appealing parallel coordinates plot
 to visualize and compare team performance across multiple metrics.
 """
 
-from dash import Dash, dcc, html, Input, Output, callback, ctx
+from dash import Dash, dcc, html, Input, Output, callback, ctx, clientside_callback
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import pandas as pd
@@ -118,23 +118,39 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
             # Create dimensions for PCP
             dimensions = []
             for attr in attrs:
-                min_val = max(0, selected_df[attr].min() * 0.9)
-                max_val = selected_df[attr].max() * 1.1
+                # Calculate actual data range for each attribute
+                min_val = selected_df[attr].min()
+                max_val = selected_df[attr].max()
+                
+                # Add padding to the range
+                range_padding = (max_val - min_val) * 0.1
+                range_min = max(0, min_val - range_padding)
+                range_max = max_val + range_padding
+                
                 tick_format = tick_formats.get(attr, '.1f')
-                step = (max_val - min_val) / 5
-                tick_values = [min_val + i * step for i in range(6)]
+                
+                # Create exactly 5 nicely spaced ticks using the actual data range
+                tick_values = []
+                for i in range(5):
+                    tick_val = range_min + (range_max - range_min) * (i / 4)
+                    tick_values.append(tick_val)
+                
+                # Format tick labels with appropriate precision
+                formatted_ticks = [f"{v:.1f}" for v in tick_values]
+                
                 # Highlight label if matches x_axis or y_axis
                 label_html = labels.get(attr, attr.replace('_', ' ').title())
                 if (x_axis and attr == x_axis) or (y_axis and attr == y_axis):
                     label_html = f'<b>🔵 {label_html.upper()}</b>'
+                
                 dimensions.append(
                     dict(
-                        range=[min_val, max_val],
+                        range=[range_min, range_max],
                         label=label_html,
                         values=selected_df[attr].tolist(),
                         tickvals=tick_values,
-                        ticktext=[f"{v:.1f}" for v in tick_values],
-                        tickformat=tick_format
+                        ticktext=formatted_ticks,
+                        tickformat=None
                     )
                 )
             fig.add_trace(
@@ -148,6 +164,7 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
                     labelangle=0,
                     labelfont=dict(size=14, family="Arial", color="#333333"),
                     rangefont=dict(size=11, family="Arial", color="#666666"),
+                    tickfont=dict(size=10, family="Arial", color="#333333")
                 )
             )
             # Add hidden individual scatter traces for each attribute to enable hover
@@ -206,7 +223,7 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
             },
             plot_bgcolor='rgba(255,255,255,1)',   # White background
             paper_bgcolor='rgba(255,255,255,1)',  # White background
-            height=700,  # Taller for better visibility
+            height=900,  # Taller for better visibility
             margin=dict(l=80, r=80, t=100, b=100),  # Margins
             
             # Move legend outside and below the plot
@@ -272,18 +289,23 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
         Output('parcats-plot', 'figure'),
         [Input(ids.TEAMS_DROPDOWN, 'value')] +
         ([Input(x_axis_dropdown_id, "value")] if x_axis_dropdown_id else []) +
-        ([Input(y_axis_dropdown_id, "value")] if y_axis_dropdown_id else [])
+        ([Input(y_axis_dropdown_id, "value")] if y_axis_dropdown_id else []) +
+        [Input('parcats-plot', 'clickData')]
     )
-    def update_parcats(selected_teams, x_axis=None, y_axis=None):
+    def update_parcats(selected_teams, x_axis=None, y_axis=None, click_data=None):
         df = load_team_data()
         if not selected_teams or len(selected_teams) == 0:
             return go.Figure()
+            
         selected_df = df[df['team'].isin(selected_teams)].copy()
+        
+        # Define the attributes and their labels
         attrs = [
             'possession', 'shots_per90', 'goals_per90', 'assists_per90',
             'passes_pct', 'passes_pct_short', 'passes_pct_medium', 'passes_pct_long',
             'tackles_interceptions', 'gk_save_pct'
         ]
+        
         labels = {
             'possession': 'Possession %',
             'shots_per90': 'Shots per 90',
@@ -299,68 +321,157 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
 
         # Define meaningful categories for each metric
         def create_categories(series, metric):
-            if metric == 'possession':
-                bins = [0, 40, 50, 60, 100]
-                labels = ['Low (<40%)', 'Below Avg (40-50%)', 'Above Avg (50-60%)', 'High (>60%)']
-            elif metric == 'shots_per90':
-                bins = [0, 10, 13, 16, 100]
-                labels = ['Low (<10)', 'Below Avg (10-13)', 'Above Avg (13-16)', 'High (>16)']
-            elif metric == 'goals_per90':
-                bins = [0, 1.2, 1.5, 1.8, 100]
-                labels = ['Low (<1.2)', 'Below Avg (1.2-1.5)', 'Above Avg (1.5-1.8)', 'High (>1.8)']
-            elif metric == 'assists_per90':
-                bins = [0, 0.8, 1.0, 1.2, 100]
-                labels = ['Low (<0.8)', 'Below Avg (0.8-1.0)', 'Above Avg (1.0-1.2)', 'High (>1.2)']
-            elif metric in ['passes_pct', 'passes_pct_short', 'passes_pct_medium', 'passes_pct_long']:
-                bins = [0, 75, 80, 85, 100]
-                labels = ['Low (<75%)', 'Below Avg (75-80%)', 'Above Avg (80-85%)', 'High (>85%)']
-            elif metric == 'tackles_interceptions':
-                bins = [0, 15, 20, 25, 100]
-                labels = ['Low (<15)', 'Below Avg (15-20)', 'Above Avg (20-25)', 'High (>25)']
-            elif metric == 'gk_save_pct':
-                bins = [0, 65, 70, 75, 100]
-                labels = ['Low (<65%)', 'Below Avg (65-70%)', 'Above Avg (70-75%)', 'High (>75%)']
-            else:
+            # Use quantile-based binning instead of fixed thresholds
+            # This creates more evenly distributed categories based on actual data
+            try:
+                # Calculate quartiles (25%, 50%, 75%) to create 4 categories
+                q1 = series.quantile(0.25)
+                q2 = series.quantile(0.50) # median
+                q3 = series.quantile(0.75)
+                
+                bins = [series.min() - 0.001, q1, q2, q3, series.max() + 0.001]
+                
+                # Create descriptive labels with actual value ranges
+                labels = [
+                    f'Low (<{q1:.1f})',
+                    f'Below Avg ({q1:.1f}-{q2:.1f})',
+                    f'Above Avg ({q2:.1f}-{q3:.1f})',
+                    f'High (>{q3:.1f})'
+                ]
+                
+                # Special formatting for percentage metrics
+                if "pct" in metric or metric == "possession":
+                    labels = [
+                        f'Low (<{q1:.1f}%)',
+                        f'Below Avg ({q1:.1f}%-{q2:.1f}%)',
+                        f'Above Avg ({q2:.1f}%-{q3:.1f}%)',
+                        f'High (>{q3:.1f}%)'
+                    ]
+                
+                return pd.cut(series, bins=bins, labels=labels, include_lowest=True)
+            except:
+                # Fallback in case of error (e.g., all identical values)
                 return series.astype(str)
-            
-            return pd.cut(series, bins=bins, labels=labels, include_lowest=True)
-
-        # Build team-to-color mapping based on the order of selected_teams (same as PCP)
-        colorblind_palette = team_radar_task2.COLORBLIND_PALETTE
-        team_color_map = {team: colorblind_palette[i % len(colorblind_palette)] for i, team in enumerate(selected_teams)}
-        team_color_list = [team_color_map[team] for team in selected_df['team']]
-
-        # Build dimensions for parcats
-        dimensions = [
-            dict(values=selected_df['team'].astype(str), label='Team', categoryorder='array', categoryarray=[str(t) for t in selected_df['team'].tolist()])
-        ]
         
+        # STEP 1: Collect all category data first
+        all_category_data = []
+        category_names = []
+        dimensions = []
+        
+        # Process the team dimension
+        dimensions.append(dict(
+            values=selected_df['team'].astype(str), 
+            label='Team', 
+            categoryorder='array', 
+            categoryarray=[str(t) for t in selected_df['team'].tolist()]
+        ))
+        
+        # Process each attribute dimension
         for attr in attrs:
             categorized_vals = create_categories(selected_df[attr], attr)
-            # Convert all values to strings before sorting
+            all_category_data.append(categorized_vals)
+            
+            # Convert values to strings for Plotly
+            str_vals = categorized_vals.astype(str)
             unique_vals = sorted([str(v) for v in categorized_vals.unique()])
+            category_names.append(unique_vals)
+            
+            # Set the dimension label
             label_html = labels[attr]
             if (x_axis is not None and attr == x_axis) or (y_axis is not None and attr == y_axis):
                 label_html = f'🔵 {label_html.upper()}'
+            
             dimensions.append(dict(
-                values=categorized_vals.astype(str),  # Ensure values are strings
+                values=str_vals,
                 label=label_html,
                 categoryorder='array',
-                categoryarray=unique_vals,
-                ticktext=unique_vals
+                categoryarray=unique_vals
             ))
-
-        fig = go.Figure(
-            go.Parcats(
-                dimensions=dimensions,
-                line=dict(color=team_color_list, shape='hspline'),
-                hoveron='category',
-                arrangement='perpendicular',
-                labelfont=dict(size=12, family="Courier New, monospace", color="#222"),
-                bundlecolors=False,
-                domain=dict(y=[0, 1])
-            )
+        
+        # STEP 2: Process click data to determine highlighting
+        # Default: no highlighting - all teams get their normal colors
+        colorblind_palette = team_radar_task2.COLORBLIND_PALETTE
+        team_color_list = [colorblind_palette[i % len(colorblind_palette)] for i, team in enumerate(selected_df['team'])]
+        
+        # Get the clicked category info from click_data if it exists
+        highlight_paths = False
+        if click_data and 'points' in click_data and len(click_data['points']) > 0:
+            point = click_data['points'][0]
+            if 'curveNumber' in point and 'pointNumber' in point:
+                # Get dimension index (subtract 1 because first dimension is team names)
+                dim_idx = point['curveNumber'] - 1
+                if dim_idx >= 0 and dim_idx < len(all_category_data):
+                    # Get the category data for this dimension
+                    cat_data = all_category_data[dim_idx]
+                    cat_unique = category_names[dim_idx]
+                    if 'label' in point:
+                        clicked_category = point['label']
+                    elif 'pointNumber' in point and point['pointNumber'] < len(cat_unique):
+                        clicked_category = cat_unique[point['pointNumber']]
+                    else:
+                        clicked_category = None
+                        
+                    if clicked_category:
+                        highlight_paths = True
+                        # Create a high contrast effect instead of outlining
+                        team_color_list = []
+                        
+                        # Create color list with highlighted and almost invisible paths
+                        for i, (team, cat) in enumerate(zip(selected_df['team'], cat_data)):
+                            base_color = colorblind_palette[i % len(colorblind_palette)]
+                            if str(cat) == clicked_category:
+                                # Keep vivid colors for highlighted paths
+                                team_color_list.append(base_color)
+                            else:
+                                # Make non-highlighted paths almost invisible
+                                team_color_list.append('rgba(220, 220, 220, 0.15)')
+        
+        # STEP 3: Create the Parcats plot
+        parcats_trace = go.Parcats(
+            dimensions=dimensions,
+            line=dict(
+                color=team_color_list, 
+                shape='hspline'
+            ),
+            hoveron='category',
+            arrangement='perpendicular',
+            labelfont=dict(size=12, family="Courier New, monospace", color="#222"),
+            bundlecolors=False,
+            domain=dict(y=[0, 1])
         )
+        
+        # Create the figure with the parcats trace
+        fig = go.Figure(parcats_trace)
+        
+        # Add explanation and reset button for highlighting
+        if highlight_paths:
+            # Add explanation annotation
+            fig.add_annotation(
+                text=f"<b>Showing paths through {clicked_category}</b> - Click anywhere to reset",
+                xref="paper", yref="paper",
+                x=0.5, y=1.08,
+                showarrow=False,
+                font=dict(size=12, color="#222"),
+                bgcolor="rgba(255, 253, 150, 0.95)",
+                bordercolor="#555",
+                borderwidth=1,
+                borderpad=4
+            )
+        else:
+            # Add instruction annotation
+            fig.add_annotation(
+                text="Click on any category box to highlight related paths",
+                xref="paper", yref="paper",
+                x=0.5, y=1.08,
+                showarrow=False,
+                font=dict(size=12, color="#222"),
+                bgcolor="rgba(220, 220, 255, 0.95)",
+                bordercolor="#555",
+                borderwidth=1,
+                borderpad=4
+            )
+        
+        # STEP 4: Update layout and add instructions
         fig.update_layout(
             title={
                 'text': "Parallel Categories Plot (Binned Metrics)",
@@ -378,8 +489,11 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
             xaxis=dict(
                 tickangle=45,  # Angle the labels
                 automargin=True  # Automatically adjust margins
-            )
+            ),
+            # Enable click events
+            clickmode='event'
         )
+        
         return fig
 
     # --- Layout ---
