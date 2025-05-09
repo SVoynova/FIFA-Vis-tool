@@ -18,9 +18,12 @@ app = dash.Dash(
     suppress_callback_exceptions=True
 )
 
+# Set the app title
+app.title = "FIFA World Cup 2022 Dashboard"
+
 # Set the layout using the create_layout function from components/layout.py
 app.layout = create_layout(app)
 
-# Run the app
+# Only run the server if this file is run directly
 if __name__ == "__main__":
-    app.run(debug=True, port=8052)
+    app.run_server(debug=True, port=8052)

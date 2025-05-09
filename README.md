@@ -1,65 +1,97 @@
-# FIFA World Cup 2022 – Visualization Tool
+# FIFA World Cup 2022 Visualization Dashboard
 
-An interactive visualization tool for analyzing match-level performance and dynamics in the FIFA World Cup 2022, focusing on identifying patterns, upsets, and team behavior across tournament stages.
+An interactive data visualization dashboard for analyzing team and player performance during the FIFA World Cup 2022. This tool provides multiple coordinated views including scatter plots, parallel coordinates plots, and radar charts to explore patterns and insights across different tournament stages.
 
-## Project Structure
+## Features
 
-- `data/cleaned/` – Cleaned CSV files used in the project
-- `scripts/` – Data cleaning and preparation scripts
-- `app/` – Contains the Dash app and all components
-- `requirements.txt` – Python dependencies
-- `setup.sh` – Optional setup script to configure environment
+- **Interactive Scatter Plot**: Compare team metrics with customizable X and Y axes
+- **Tournament Stage Filtering**: Filter teams by their progression in the tournament
+- **Parallel Coordinates Plot**: Analyze multiple performance metrics simultaneously
+- **Radar Charts**: Visualize team and player performance across standardized dimensions
+- **Team Selection**: Select and compare specific teams across all visualizations
 
-## Python Version
+## Requirements
 
-This project requires **Python 3.11.5**.
-It is recommended to use a virtual environment (e.g., `venv` or `conda`).
+- Python 3.8 or higher
+- Libraries: dash, dash-bootstrap-components, pandas, numpy, plotly
 
-## Setup Instructions
+## Quick Start
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/SVoynova/FIFA-Vis-tool
-   cd FIFA-Vis-tool
+1. **Clone or download the repository**
+
+2. **Create and activate a virtual environment (optional but recommended)**
+   ```
+   python -m venv venv
+   # On Windows:
+   venv\Scripts\activate
+   # On macOS/Linux:
+   source venv/bin/activate
    ```
 
-2. **Create and activate a virtual environment (recommended):**
-   - Using `venv`:
-     ```bash
-     python3.11 -m venv env
-     source env/bin/activate  # On Windows: env\Scripts\activate
-     ```
-   - Or using `conda`:
-     ```bash
-     conda create -n fifa-env python=3.11.5
-     conda activate fifa-env
-     ```
-
-3. **Install dependencies:**
-   ```bash
+3. **Install the required packages**
+   ```
    pip install -r requirements.txt
    ```
 
-4. **Prepare the data:**
-   - Ensure the cleaned data files are present in `data/cleaned/`.
-   - If not, run the scripts in the `scripts/` directory to generate them.
+4. **Run the dashboard using one of these methods:**
+   
+   - **Using the provided scripts:**
+     - Windows: Double-click `run_dashboard.bat` or run it from the command line
+     - macOS/Linux: Open terminal and run `./run_dashboard.sh` (you may need to make it executable with `chmod +x run_dashboard.sh`)
+   
+   - **Using Python directly:**
+     ```
+     python -m app.main
+     ```
 
-5. **Run the dashboard:**
-   ```bash
-   python app/main.py
+5. **Open your browser and navigate to**
    ```
-   - The dashboard will be available at [http://127.0.0.1:8052/](http://127.0.0.1:8052/)
+   http://127.0.0.1:8052/
+   ```
 
-## Notes
+## Project Structure
 
-- The dashboard uses Dash and Plotly for interactive visualizations.
-- For best results, use the latest version of Chrome or Firefox.
-- If you encounter issues with missing data, check the `data/cleaned/` directory and the scripts in `scripts/`.
+- `app/` - Dashboard application code
+  - `main.py` - Main entry point for the Dash application
+  - `components/` - Modular dashboard components
+    - `scatter_plot.py` - Team capability comparison scatter plot
+    - `pcp.py` - Parallel coordinates plot for multi-dimensional comparison
+    - `team_radar_task2.py` - Team performance radar chart
+    - `player_radar_task2.py` - Player performance radar chart
+    - `filter.py` - Tournament stage filter
+    - Other component files...
 
-## Final Checklist for GitHub
+- `data/cleaned/` - Preprocessed datasets
+  - `team_data_clean.csv` - Team statistics and metrics
+  - `player_performance_scores.csv` - Player performance data
+  - `team_performance_scores.csv` - Team performance data
 
-- [x] All code is committed and pushed.
-- [x] `requirements.txt` is up to date.
-- [x] README is clear and comprehensive.
-- [x] No sensitive data or credentials are present.
-- [x] The app runs without errors using the above instructions.
+- `run_dashboard.bat` - Windows script to launch the dashboard
+- `run_dashboard.sh` - macOS/Linux script to launch the dashboard
+
+## Usage Guide
+
+1. **Filter by Tournament Stage**: Use the dropdown to select tournament stages (Group Stage through Finals)
+2. **Select Teams to Analyze**: Choose specific teams to focus on across all visualizations
+3. **Explore Team Metrics**: Use the scatter plot's X and Y axis dropdowns to compare different metrics
+4. **Compare Multi-dimensional Data**: Examine the parallel coordinates plot to see patterns across multiple metrics
+5. **Analyze Radar Charts**: View standardized team and player performance dimensions
+
+## Troubleshooting
+
+- If you see a "No teams available" message, try changing the tournament stage filter to include more teams.
+- Ensure all data files are present in the `data/cleaned/` directory.
+- Package version conflicts can be resolved by using a clean virtual environment and installing from requirements.txt.
+- For Windows users: If you get "ModuleNotFoundError", make sure you're running from the project root directory.
+
+## Data Sources
+
+The data is derived from official FIFA World Cup 2022 statistics and has been preprocessed for visualization purposes.
+
+## License
+
+This project is available under the MIT License - see the LICENSE file for details.
+
+---
+
+*Project created for Data Visualization course, TU Eindhoven, 2023-2024*

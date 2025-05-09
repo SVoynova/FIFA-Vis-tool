@@ -1,17 +1,42 @@
-# Ignore virtual environments
-envs/
-venv/
-.fifa-env/
-
-# Ignore Python cache
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Ignore notebook checkpoints
-.ipynb_checkpoints/
+# Virtual Environment
+venv/
+env/
+ENV/
 
-# Ignore macOS system files
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Jupyter Notebook
+.ipynb_checkpoints
 
 # Ignore raw data
 data/player_data/

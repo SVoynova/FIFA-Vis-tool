@@ -1,0 +1,10 @@
+services:
+  # A web service
+  - type: web
+    name: fifa-vis-dashboard
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:server
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0 
