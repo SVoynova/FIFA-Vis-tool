@@ -67,135 +67,177 @@ def render(app: Dash) -> html.Div:
     @app.callback(
         Output(ids.PLAYER_RADAR_TASK2_DROPDOWN, 'options'),
         Output(ids.PLAYER_RADAR_TASK2_DROPDOWN, 'value'),
-        Input(ids.TEAMS_DROPDOWN, 'value')
+        [
+            Input(ids.TEAMS_DROPDOWN, 'value'),
+            Input(ids.FILTERED_TEAMS_STORE, 'data')
+        ]
     )
-    def update_player_dropdown(selected_teams):
+    def update_player_dropdown(selected_teams, filtered_teams):
+        # Start with all teams
+        available_teams = set(PLAYER_DATA['team'].unique())
+        
+        # Filter by tournament stage if applicable
+        if filtered_teams:
+            available_teams = set(filtered_teams)
+        
+        # If no teams selected, show only players from teams that pass the tournament stage filter
         if not selected_teams or len(selected_teams) == 0:
-            # If no teams selected, show all players
-            options = [
-                {'label': f"{row['player']} ({row['team']})", 'value': row['player']}
-                for _, row in PLAYER_DATA.iterrows()
-            ]
-            # Default value: first player
-            value = [PLAYER_DATA['player'].iloc[0]] if not PLAYER_DATA.empty else []
-        else:
-            # Filter players from selected teams
-            filtered_players = PLAYER_DATA[PLAYER_DATA['team'].isin(selected_teams)]
+            # Filter by tournament stage
+            filtered_players = PLAYER_DATA[PLAYER_DATA['team'].isin(available_teams)]
             options = [
                 {'label': f"{row['player']} ({row['team']})", 'value': row['player']}
                 for _, row in filtered_players.iterrows()
             ]
-            # Default value: first player from the filtered list
-            value = [filtered_players['player'].iloc[0]] if not filtered_players.empty else []
+            # Default value: empty selection
+            value = []
+        else:
+            # Filter by selected teams AND tournament stage filter
+            filtered_selected_teams = [team for team in selected_teams if team in available_teams]
+            filtered_players = PLAYER_DATA[PLAYER_DATA['team'].isin(filtered_selected_teams)]
+            options = [
+                {'label': f"{row['player']} ({row['team']})", 'value': row['player']}
+                for _, row in filtered_players.iterrows()
+            ]
+            # Default value: empty selection
+            value = []
         
         return options, value
     
     # Define callback for the radar chart
     @app.callback(
         Output(ids.PLAYER_RADAR_TASK2_CHART, 'figure'),
-        Input(ids.PLAYER_RADAR_TASK2_DROPDOWN, 'value')
+        [
+            Input(ids.PLAYER_RADAR_TASK2_DROPDOWN, 'value'),
+            Input(ids.TEAMS_DROPDOWN, 'value'),
+            Input(ids.FILTERED_TEAMS_STORE, 'data')
+        ]
     )
-    def update_radar(selected_players):
+    def update_radar(selected_players, selected_teams, filtered_teams):
         fig = go.Figure()
-
-        if not selected_players or len(selected_players) == 0:
-            # Return empty figure if no players selected
-            fig.update_layout(
-                title="Select players to display their radar chart",
-                title_x=0.5,
-                paper_bgcolor='rgba(250, 250, 250, 0.9)',
-                height=500
+        
+        # Start with a base filter of all teams
+        available_teams = set(PLAYER_DATA['team'].unique())
+        
+        # Apply tournament stage filter if present
+        if filtered_teams:
+            available_teams = set(filtered_teams)
+        
+        # If there are teams selected, further filter to those teams
+        if selected_teams and len(selected_teams) > 0:
+            # Filter selected teams to only include those that match tournament stage
+            filtered_team_selection = [team for team in selected_teams if team in available_teams]
+            if filtered_team_selection:
+                # If we have teams remaining after filtering
+                available_teams = set(filtered_team_selection)
+            else:
+                # All selected teams were filtered out
+                fig.add_annotation(
+                    text="No selected teams available for the current tournament stage filter",
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5,
+                    showarrow=False,
+                    font=dict(size=16, color="#666666")
+                )
+                fig.update_layout(
+                    title="Tournament Stage Filter Applied",
+                    title_x=0.5,
+                    paper_bgcolor='rgba(250, 250, 250, 0.9)',
+                    height=500
+                )
+                return fig
+                
+        # Check if we have players selected from the dropdown
+        if selected_players and len(selected_players) > 0:
+            # Filter to only include players from teams that match tournament stage
+            filtered_player_data = PLAYER_DATA[PLAYER_DATA['team'].isin(available_teams)]
+            
+            # Further filter to selected players
+            filtered_selected_players = filtered_player_data[filtered_player_data['player'].isin(selected_players)]
+            
+            # If we have matching players
+            if not filtered_selected_players.empty:
+                # Process players for radar chart
+                radar_players = []
+                for _, player_row in filtered_selected_players.iterrows():
+                    values = [player_row[dim] for dim in dimensions]
+                    radar_players.append((player_row['player'], sum(values), player_row, values))
+                
+                # Sort by radar size (smallest first)
+                radar_players.sort(key=lambda x: x[1])
+                
+                # Add traces for each player
+                for idx, (player_name, size, row, values) in enumerate(radar_players):
+                    # Close the loop
+                    radar_values = values + [values[0]]
+                    
+                    # Get color
+                    color_idx = idx % len(COLORBLIND_PALETTE)
+                    base_color = COLORBLIND_PALETTE[color_idx]
+                    
+                    # Set transparency
+                    fill_opacity = 0.2
+                    
+                    # Extract RGB components
+                    rgba_parts = base_color.replace('rgba(', '').replace(')', '').split(',')
+                    r, g, b = rgba_parts[0].strip(), rgba_parts[1].strip(), rgba_parts[2].strip()
+                    
+                    # Create fill and line colors
+                    fill_color = f"rgba({r},{g},{b},{fill_opacity})"
+                    line_color = f"rgba({r},{g},{b},1)"
+                    
+                    # Create display name
+                    team = row['team']
+                    display_name = f"{player_name} ({team})"
+                    
+                    # Add radar trace
+                    fig.add_trace(go.Scatterpolar(
+                        r=radar_values,
+                        theta=dimensions + [dimensions[0]],
+                        fill='toself',
+                        name=display_name,
+                        line=dict(
+                            color=line_color,
+                            width=1.5
+                        ),
+                        fillcolor=fill_color,
+                        text=[f"{dim}: {val:.1f}" for dim, val in zip(dimensions, values)] + [""],
+                        hoverinfo="text+name"
+                    ))
+                    
+                    # Add dots at each point for better readability
+                    fig.add_trace(go.Scatterpolar(
+                        r=radar_values,
+                        theta=dimensions + [dimensions[0]],
+                        mode='markers',
+                        marker=dict(
+                            symbol='circle',
+                            size=6,
+                            color=line_color,
+                            line=dict(color='white', width=1)
+                        ),
+                        name=f"{display_name} (points)",
+                        showlegend=False,
+                        hoverinfo="skip"
+                    ))
+            else:
+                # No players match both the selection and the tournament stage filter
+                fig.add_annotation(
+                    text="No players available for the selected teams and tournament stage",
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5,
+                    showarrow=False,
+                    font=dict(size=16, color="#666666")
+                )
+        else:
+            # Show a default message if no players selected
+            fig.add_annotation(
+                text="Select players from the dropdown to view radar chart",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5,
+                showarrow=False,
+                font=dict(size=16, color="#666666")
             )
-            return fig
-
-        # Number of players to display
-        num_players = len(selected_players)
         
-        # Create a list to store player data for ordering
-        players_with_sizes = []
-        
-        # First, collect all player data and calculate radar size
-        for player_name in selected_players:
-            player_rows = PLAYER_DATA[PLAYER_DATA['player'] == player_name]
-            
-            if not player_rows.empty:
-                row = player_rows.iloc[0]
-                
-                # Get the actual values from the dataframe for each dimension
-                values = []
-                for dim in dimensions:
-                    if dim in row:
-                        # Make sure data is numeric
-                        val = pd.to_numeric(row[dim], errors='coerce')
-                        if pd.isna(val):
-                            val = 1.0  # Default if value is missing
-                        values.append(val)
-                    else:
-                        # If dimension is missing, use default value
-                        values.append(1.0)
-                
-                # Calculate approximate "size" of radar by summing values
-                size = sum(values)
-                players_with_sizes.append((player_name, size, row, values))
-        
-        # Sort players by radar size (smallest first, so they appear on top)
-        players_with_sizes.sort(key=lambda x: x[1])
-                
-        # Add traces
-        for idx, (player_name, size, row, values) in enumerate(players_with_sizes):
-            # Close the loop by adding the first value again
-            radar_values = values + [values[0]]
-            
-            # Use colorblind-friendly palette with cycling
-            color_idx = idx % len(COLORBLIND_PALETTE)
-            base_color = COLORBLIND_PALETTE[color_idx]
-            
-            # Set very transparent fill (opacity 0.2) to match reference image
-            fill_opacity = 0.2
-            
-            # Create a display name that includes team in parentheses
-            team = row['team']
-            display_name = f"{player_name} ({team})"
-            
-            # Extract RGB components
-            rgba_parts = base_color.replace('rgba(', '').replace(')', '').split(',')
-            r, g, b = rgba_parts[0].strip(), rgba_parts[1].strip(), rgba_parts[2].strip()
-            
-            # Create fill and line colors
-            fill_color = f"rgba({r},{g},{b},{fill_opacity})"
-            line_color = f"rgba({r},{g},{b},1)"  # Full opacity for line
-            
-            # Add radar trace with visible lines and transparent fills
-            fig.add_trace(go.Scatterpolar(
-                r=radar_values,
-                theta=dimensions + [dimensions[0]],
-                fill='toself',
-                name=display_name,
-                line=dict(
-                    color=line_color,
-                    width=1.5
-                ),
-                fillcolor=fill_color,
-                text=[f"{dim}: {val:.1f}" for dim, val in zip(dimensions, values)] + [""],
-                hoverinfo="text+name"
-            ))
-            
-            # Add dots at each point for better readability
-            fig.add_trace(go.Scatterpolar(
-                r=radar_values,
-                theta=dimensions + [dimensions[0]],
-                mode='markers',
-                marker=dict(
-                    symbol='circle',
-                    size=6,
-                    color=line_color,
-                    line=dict(color='white', width=1)
-                ),
-                name=f"{display_name} (points)",
-                showlegend=False,
-                hoverinfo="skip"
-            ))
-
         # Configure layout to match reference image
         fig.update_layout(
             polar=dict(

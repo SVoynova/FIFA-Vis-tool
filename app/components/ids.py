@@ -9,6 +9,9 @@ SCATTER_PLOT = "scatter-plot"
 SEARCH_BAR = "search-bar"
 FILTER = "filter"
 
+# Shared data store 
+FILTERED_TEAMS_STORE = "filtered-teams-store"
+
 # Parallel coordinates components
 TEAMS_DROPDOWN = "teams-dropdown"
 PCP = "pcp"

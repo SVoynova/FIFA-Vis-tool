@@ -15,6 +15,9 @@ def create_layout(app: Dash) -> dbc.Container:
     return dbc.Container(
         fluid=True,
         children=[
+            # Store for filtered teams (shared between components)
+            dcc.Store(id=ids.FILTERED_TEAMS_STORE, data=[]),
+            
             # Title section with FIFA World Cup branding
             dbc.Row([
                 dbc.Col([

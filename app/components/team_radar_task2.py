@@ -54,11 +54,20 @@ def render(app: Dash) -> html.Div:
     # Define callback for the radar chart to use the global team selector
     @app.callback(
         Output(ids.TEAM_RADAR_TASK2_CHART, 'figure'),
-        Input(ids.TEAMS_DROPDOWN, 'value')
+        [
+            Input(ids.TEAMS_DROPDOWN, 'value'),
+            Input(ids.FILTERED_TEAMS_STORE, 'data')
+        ]
     )
-    def update_radar_chart(selected_teams):
+    def update_radar_chart(selected_teams, filtered_teams):
         fig = go.Figure()
 
+        # Filter teams based on tournament stage first
+        available_teams = set(TEAM_DATA['team'].unique())
+        if filtered_teams:
+            available_teams = set(filtered_teams)
+        
+        # Apply team selection
         if not selected_teams or len(selected_teams) == 0:
             # If no teams selected, show a prompt
             fig.update_layout(
@@ -69,14 +78,34 @@ def render(app: Dash) -> html.Div:
             )
             return fig
 
+        # Filter selected teams to only those that match the tournament stage filter
+        filtered_selected_teams = [team for team in selected_teams if team in available_teams]
+        
+        # If all selected teams were filtered out, show a message
+        if not filtered_selected_teams:
+            fig.add_annotation(
+                text="No selected teams available for the current tournament stage filter",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5,
+                showarrow=False,
+                font=dict(size=16, color="#666666")
+            )
+            fig.update_layout(
+                title="Tournament Stage Filter Applied",
+                title_x=0.5,
+                paper_bgcolor='rgba(250, 250, 250, 0.9)',
+                height=500
+            )
+            return fig
+
         # Get the number of teams to display
-        num_teams = len(selected_teams)
+        num_teams = len(filtered_selected_teams)
         
         # Create a list to store team data for ordering
         team_with_sizes = []
         
         # First, collect all team data and calculate radar size
-        for team in selected_teams:
+        for team in filtered_selected_teams:
             team_data = TEAM_DATA[TEAM_DATA['team'] == team]
             if not team_data.empty:
                 row = team_data.iloc[0]

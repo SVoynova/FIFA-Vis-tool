@@ -66,23 +66,35 @@ def bin_column_with_ranges(series, bins=3):
     return pd.cut(series, bins=bin_edges, labels=labels, include_lowest=True)
 
 def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.Div:
-    """Render the parallel coordinates plot and a parallel categories plot above it"""
+    """Create a PCP visualization with customizable styling"""
+    
     @callback(
         Output(ids.PCP, "figure"),
-        [Input(ids.TEAMS_DROPDOWN, "value")] +
+        [Input(ids.TEAMS_DROPDOWN, "value"),
+         Input(ids.FILTERED_TEAMS_STORE, "data")] +
         ([Input(x_axis_dropdown_id, "value")] if x_axis_dropdown_id else []) +
         ([Input(y_axis_dropdown_id, "value")] if y_axis_dropdown_id else [])
     )
-    def update_pcp(selected_teams, x_axis=None, y_axis=None):
-        # Load the data
+    def update_pcp(selected_teams, filtered_teams, x_axis=None, y_axis=None):
+        """Update the PCP visualization"""
         df = load_team_data()
-        colorblind_palette = team_radar_task2.COLORBLIND_PALETTE
         fig = go.Figure()
+        
+        # Only show teams that match the tournament stage filter
+        if filtered_teams:
+            df = df[df['team'].isin(filtered_teams)]
+            
+        # Use colorblind-friendly palette
+        colorblind_palette = team_radar_task2.COLORBLIND_PALETTE
+        
+        # Define attributes for the PCP
         attrs = [
             'possession', 'shots_per90', 'goals_per90', 'assists_per90',
             'passes_pct', 'passes_pct_short', 'passes_pct_medium', 'passes_pct_long',
             'tackles_interceptions', 'gk_save_pct'
         ]
+        
+        # Define friendly labels for attributes
         labels = {
             'possession': 'Possession %',
             'shots_per90': 'Shots per 90',
@@ -195,21 +207,23 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
 
             # Create a separate legend showing teams
             for i, team in enumerate(selected_teams):
-                color_idx = i % len(colorblind_palette)
-                team_color = colorblind_palette[color_idx]
-                fig.add_trace(
-                    go.Scatter(
-                        x=[None],
-                        y=[None],
-                        mode='lines',
-                        line=dict(
-                            color=team_color,
-                            width=4,
-                        ),
-                        name=team,
-                        showlegend=True
+                # Only add to legend if team is in the filtered data (passes tournament stage filter)
+                if team in filtered_teams:
+                    color_idx = i % len(colorblind_palette)
+                    team_color = colorblind_palette[color_idx]
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[None],
+                            y=[None],
+                            mode='lines',
+                            line=dict(
+                                color=team_color,
+                                width=4,
+                            ),
+                            name=team,
+                            showlegend=True
+                        )
                     )
-                )
         
         # Update layout with white background and improved styling
         fig.update_layout(
@@ -246,18 +260,31 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
     # Generate legend content for selected teams
     @callback(
         Output("pcp-legend", "children"),
-        [Input(ids.TEAMS_DROPDOWN, "value")]
+        [Input(ids.TEAMS_DROPDOWN, "value"),
+         Input(ids.FILTERED_TEAMS_STORE, "data")]
     )
-    def update_legend(selected_teams):
+    def update_legend(selected_teams, filtered_teams):
         if not selected_teams or len(selected_teams) == 0:
             return html.Div([
                 html.H6("No Teams Selected", className="mb-2 text-center"),
                 html.P("Select teams above to visualize them in the plot.", className="text-center text-muted")
             ])
         
+        # Filter teams based on tournament stage filter
+        available_teams = selected_teams
+        if filtered_teams:
+            available_teams = [team for team in selected_teams if team in filtered_teams]
+            
+        # If all selected teams were filtered out
+        if not available_teams:
+            return html.Div([
+                html.H6("No Teams Available For Current Filter", className="mb-2 text-center"),
+                html.P("No selected teams reached this tournament stage.", className="text-center text-muted")
+            ], className="bg-light p-3 rounded shadow-sm")
+        
         # Build legend items using consistent team colors
         legend_items = []
-        for team in selected_teams:
+        for team in available_teams:
             color = data_utils.get_team_color(team)
             legend_items.append(
                 html.Div([
@@ -275,7 +302,7 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
             )
         
         return html.Div([
-            html.H6(f"Selected Teams ({len(selected_teams)})", className="text-center mb-3"),
+            html.H6(f"Selected Teams ({len(available_teams)})", className="text-center mb-3"),
             html.Div(legend_items, style={
                 "display": "flex", 
                 "flexWrap": "wrap", 
@@ -287,17 +314,44 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
     # --- Parallel Categories Plot ---
     @callback(
         Output('parcats-plot', 'figure'),
-        [Input(ids.TEAMS_DROPDOWN, 'value')] +
+        [Input(ids.TEAMS_DROPDOWN, 'value'),
+         Input(ids.FILTERED_TEAMS_STORE, 'data')] +
         ([Input(x_axis_dropdown_id, "value")] if x_axis_dropdown_id else []) +
         ([Input(y_axis_dropdown_id, "value")] if y_axis_dropdown_id else []) +
         [Input('parcats-plot', 'clickData')]
     )
-    def update_parcats(selected_teams, x_axis=None, y_axis=None, click_data=None):
+    def update_parcats(selected_teams, filtered_teams, x_axis=None, y_axis=None, click_data=None):
         df = load_team_data()
         if not selected_teams or len(selected_teams) == 0:
             return go.Figure()
+        
+        # Apply tournament stage filter
+        if filtered_teams:
+            df = df[df['team'].isin(filtered_teams)]
             
-        selected_df = df[df['team'].isin(selected_teams)].copy()
+        # Filter by selected teams
+        filtered_selected_teams = [team for team in selected_teams if team in df['team'].unique()]
+        
+        # If all teams were filtered out by tournament stage
+        if not filtered_selected_teams:
+            fig = go.Figure()
+            fig.add_annotation(
+                text="No selected teams available for the current tournament stage filter",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5,
+                showarrow=False,
+                font=dict(size=16, color="#666666")
+            )
+            fig.update_layout(
+                title="Tournament Stage Filter Applied",
+                title_x=0.5,
+                height=700,
+                plot_bgcolor='#f5f5f5',
+                paper_bgcolor='#f5f5f5'
+            )
+            return fig
+            
+        selected_df = df[df['team'].isin(filtered_selected_teams)].copy()
         
         # Define the attributes and their labels
         attrs = [
@@ -453,19 +507,6 @@ def render(app: Dash, x_axis_dropdown_id=None, y_axis_dropdown_id=None) -> html.
                 showarrow=False,
                 font=dict(size=12, color="#222"),
                 bgcolor="rgba(255, 253, 150, 0.95)",
-                bordercolor="#555",
-                borderwidth=1,
-                borderpad=4
-            )
-        else:
-            # Add instruction annotation
-            fig.add_annotation(
-                text="Click on any category box to highlight related paths",
-                xref="paper", yref="paper",
-                x=0.5, y=1.08,
-                showarrow=False,
-                font=dict(size=12, color="#222"),
-                bgcolor="rgba(220, 220, 255, 0.95)",
                 bordercolor="#555",
                 borderwidth=1,
                 borderpad=4

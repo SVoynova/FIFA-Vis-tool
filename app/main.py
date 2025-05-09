@@ -6,7 +6,7 @@ import os
 
 from dash import dcc, html
 from dash.dependencies import Input, Output
-from components.layout import create_layout
+from app.components.layout import create_layout
 
 # Initialize the Dash app with Bootstrap styling
 app = dash.Dash(
