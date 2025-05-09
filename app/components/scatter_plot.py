@@ -78,52 +78,18 @@ def render(app: Dash) -> dcc.Graph:
         # Store the list of filtered teams for other components to use
         filtered_teams = filtered_df["team"].unique().tolist()
         
-        # Add jitter to avoid point overlap
-        filtered_df["x"] = add_jitter(filtered_df[x_col])
-        filtered_df["y"] = add_jitter(filtered_df[y_col])
-
         # Create a figure with custom traces for better accessibility
         fig = go.Figure()
         
-        # Get all teams from the filtered data
-        teams_to_show = filtered_df["team"].unique().tolist()
+        # Instead of showing all teams, show a message to select teams
+        fig.add_annotation(
+            text="Select teams from the dropdown to display them on the scatter plot",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5,
+            showarrow=False,
+            font=dict(size=16, color="#666666")
+        )
         
-        # Create one trace per team for better control of appearance
-        for team in teams_to_show:
-            team_df = filtered_df[filtered_df["team"] == team]
-            if team_df.empty:
-                continue
-                
-            # Get consistent color and symbol for the team
-            color = data_utils.get_team_color(team)
-            symbol = data_utils.get_team_symbol(team)
-            
-            # Add trace with distinctive color and symbol
-            fig.add_trace(go.Scatter(
-                x=team_df["x"],
-                y=team_df["y"],
-                mode="markers",
-                marker=dict(
-                    color=color,
-                    symbol=symbol,
-                    size=12,  # Same size for all points
-                    line=dict(width=2, color='#000000')  # Add thicker black outline for better visibility
-                ),
-                name=team,
-                text=team,
-                hovertemplate=f"<b>{team}</b><br>{x_col}: %{{x:.2f}}<br>{y_col}: %{{y:.2f}}<extra></extra>"
-            ))
-        
-        # If no teams are available after filtering, show an empty plot with a message
-        if len(teams_to_show) == 0:
-            fig.add_annotation(
-                text="No teams available for the selected tournament stage",
-                xref="paper", yref="paper",
-                x=0.5, y=0.5,
-                showarrow=False,
-                font=dict(size=16, color="#666666")
-            )
-            
         # Update layout
         fig.update_layout(
             xaxis_title=x_col,
@@ -172,17 +138,41 @@ def render(app: Dash) -> dcc.Graph:
         # Create a figure with custom traces for better accessibility
         fig = go.Figure()
         
-        # Get all teams and determine which ones to highlight
+        # Get all teams from filtered data
         all_teams = filtered_df["team"].unique().tolist()
-        should_highlight = selected_teams and len(selected_teams) < len(all_teams)
         
-        # Define teams to show (all or selected)
+        # Always show only selected teams if any are selected
         teams_to_show = []
-        if selected_teams and should_highlight:
+        if selected_teams:
             # Show only teams that are both selected AND exist in the filtered data
             teams_to_show = [team for team in selected_teams if team in all_teams]
-        else:
-            teams_to_show = all_teams
+        
+        # If no teams are selected, show a message instead of all teams
+        if not teams_to_show:
+            fig.add_annotation(
+                text="Select teams from the dropdown to display them on the scatter plot",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5,
+                showarrow=False,
+                font=dict(size=16, color="#666666")
+            )
+            
+            # Update layout for empty plot
+            fig.update_layout(
+                xaxis_title=x_col,
+                yaxis_title=y_col,
+                legend_title_text="Teams",
+                title={
+                    'text': "Team Capability Comparison",
+                    'x': 0.5,
+                    'xanchor': 'center'
+                },
+                margin=dict(t=50, l=20, r=20, b=40),
+                height=600,  # Set fixed height
+                plot_bgcolor='rgba(250, 250, 250, 0.9)',  # Light background
+                font=dict(size=12)  # Larger font
+            )
+            return fig
         
         # Create one trace per team for better control of appearance
         for team in teams_to_show:
@@ -194,9 +184,6 @@ def render(app: Dash) -> dcc.Graph:
             color = data_utils.get_team_color(team)
             symbol = data_utils.get_team_symbol(team)
             
-            # Set size based on whether team is selected
-            size = 16 if should_highlight and team in selected_teams else 12
-            
             # Add trace with distinctive color and symbol
             fig.add_trace(go.Scatter(
                 x=team_df["x"],
@@ -205,7 +192,7 @@ def render(app: Dash) -> dcc.Graph:
                 marker=dict(
                     color=color,
                     symbol=symbol,
-                    size=size,
+                    size=14,  # Slightly larger size for better visibility
                     line=dict(width=2, color='#000000')  # Add thicker black outline for better visibility
                 ),
                 name=team,
@@ -213,16 +200,6 @@ def render(app: Dash) -> dcc.Graph:
                 hovertemplate=f"<b>{team}</b><br>{x_col}: %{{x:.2f}}<br>{y_col}: %{{y:.2f}}<extra></extra>"
             ))
         
-        # If no teams are available after filtering, show an empty plot with a message
-        if len(teams_to_show) == 0:
-            fig.add_annotation(
-                text="No teams available for the selected criteria",
-                xref="paper", yref="paper",
-                x=0.5, y=0.5,
-                showarrow=False,
-                font=dict(size=16, color="#666666")
-            )
-            
         # Update layout
         fig.update_layout(
             xaxis_title=x_col,

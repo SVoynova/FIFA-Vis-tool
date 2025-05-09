@@ -105,7 +105,7 @@ def render(app: Dash) -> html.Div:
                         id=ids.TEAMS_DROPDOWN,
                         options=[{"label": team, "value": team} for team in all_teams],
                         multi=True,
-                        placeholder="Select teams to highlight across all charts",
+                        placeholder="Select teams to display in the scatter plot and other visualizations",
                         value=[],
                         searchable=True,
                         clearable=True,
