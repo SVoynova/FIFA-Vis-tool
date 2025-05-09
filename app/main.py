@@ -26,4 +26,4 @@ app.layout = create_layout(app)
 
 # Only run the server if this file is run directly
 if __name__ == "__main__":
-    app.run_server(debug=True, port=8052)
+    app.run(debug=True, port=8052)

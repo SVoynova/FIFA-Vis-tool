@@ -12,7 +12,7 @@ An interactive data visualization dashboard for analyzing team and player perfor
 
 ## Requirements
 
-- Python 3.8 or higher
+- Python 3.11.5 (recommended) or compatible version
 - Libraries: dash, dash-bootstrap-components, pandas, numpy, plotly
 
 ## Quick Start
